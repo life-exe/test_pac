@@ -4,10 +4,12 @@
 
 #include <nlohmann/json.hpp>
 
-int main() {
+int main()
+{
     std::ifstream file("config.json");
 
-    if (!file) {
+    if (!file)
+    {
         std::println(stderr, "Failed to open config.json");
         return EXIT_FAILURE;
     }
@@ -21,7 +23,6 @@ int main() {
         const int height = config["window"]["height"].get<int>();
 
         std::println("Hello, {}! Window: {}x{}", title, width, height);
-
     }
     catch (const std::exception& e)
     {

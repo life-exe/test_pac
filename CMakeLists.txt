@@ -13,3 +13,5 @@ target_link_libraries(game PRIVATE nlohmann_json::nlohmann_json)
 
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT game)
 set_target_properties(game PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+include(cmake/ClangFormat.cmake)

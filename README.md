@@ -15,3 +15,19 @@ cmake --build build --config Debug
 ```powershell
 .\build\Debug\game.exe
 ```
+
+## Стиль кода
+
+стиль задан файлом .clang-format
+
+проверка
+
+```powershell
+cmake --build build --target format-check
+```
+
+исправление
+
+```powershell
+cmake --build build --target format
+```
