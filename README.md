@@ -3,10 +3,9 @@
 
 ## Сборка
 ```powershell
-conan install . --output-folder=build -pr:h profiles/windows-msvc-debug -pr:b profiles/windows-msvc-debug --build=missing
-conan install . --output-folder=build -pr:h profiles/windows-msvc-release -pr:b profiles/windows-msvc-release --build=missing
-cmake -S . -B build "-DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake"
-cmake --build build --config Debug
+python automation/generate_project_files.py
+python automation/build_debug.py
+python automation/build_release.py
 ```
 
 ## Запуск
@@ -14,6 +13,13 @@ cmake --build build --config Debug
 
 ```powershell
 .\build\Debug\game.exe
+```
+
+## Очистка проекта
+
+```powershell
+python automation/clean.py --dry-run
+python automation/clean.py
 ```
 
 ## Стиль кода
@@ -24,10 +30,12 @@ cmake --build build --config Debug
 
 ```powershell
 cmake --build build --target format-check
+python automation/format_files.py --check
 ```
 
 исправление
 
 ```powershell
 cmake --build build --target format
+python automation/format_files.py
 ```
