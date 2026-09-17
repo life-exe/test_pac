@@ -29,13 +29,11 @@ python automation/clean.py
 проверка
 
 ```powershell
-cmake --build build --target format-check
 python automation/format_files.py --check
 ```
 
 исправление
 
 ```powershell
-cmake --build build --target format
 python automation/format_files.py
 ```
