@@ -8,7 +8,8 @@ int main()
 {
     std::ifstream file("config.json");
 
-    if (!file)    {
+    if (!file)
+    {
         std::println(stderr, "Failed to open config.json");
         return EXIT_FAILURE;
     }
