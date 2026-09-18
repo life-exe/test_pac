@@ -16,7 +16,7 @@ python automation/build_release.py
 Запускать из корня проекта: config.json читается из текущего каталога, а не из каталога с исполняемым файлом.
 
 ```powershell
-.\build\Debug\game.exe
+.\build\bin\Debug\Pacman.exe
 ```
 
 ## Очистка проекта
@@ -57,5 +57,20 @@ python automation/format_files.py
 результат каждого запуска — на вкладке **Actions**, статус последнего коммита виден в бейдже выше
 
 собранный Release можно скачать без локальной сборки: страница запуска → раздел **Artifacts** →
-архив `game-release` с `game.exe` и `config.json`; распаковать и запустить из каталога с `config.json`
+архив `game-release` с `Pacman.exe` и `config.json`; распаковать и запустить из каталога с `config.json`
 
+## Структура проекта
+
+```text
+project/
+├── CMakeLists.txt                 # корень: проект, настройки, find_package, подпроекты
+├── cmake/ClangFormat.cmake
+└── src/
+    └── Pacman/                    # подпроект игры
+        ├── CMakeLists.txt         # project(Pacman): цели Pacman и PacmanLib
+        ├── main.cpp               # тонкий: открыть файл, вызвать, напечатать
+        ├── Config.h               # публичный интерфейс библиотеки
+        └── Config.cpp             # разбор JSON — внутри библиотеки
+```
+
+Логика вынесена в PacmanLib: из теста можно вызвать функцию библиотеки, а main — нельзя
