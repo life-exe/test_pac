@@ -51,6 +51,7 @@ python automation/format_files.py
 
 - генерация файлов проекта (`generate_project_files.py`)
 - сборка Debug (`build_debug.py`)
+- запуск тестов (`run_tests.py`)
 - сборка Release (`build_release.py`)
 - проверка стиля (`format_files.py --check`)
 
@@ -70,7 +71,8 @@ project/
         ├── CMakeLists.txt         # project(Pacman): цели Pacman и PacmanLib
         ├── main.cpp               # тонкий: открыть файл, вызвать, напечатать
         ├── Config.h               # публичный интерфейс библиотеки
-        └── Config.cpp             # разбор JSON — внутри библиотеки
+        ├── Config.cpp             # разбор JSON — внутри библиотеки
+        └── Tests/ConfigTest.cpp   # тесты разбора конфига
 ```
 
 Логика вынесена в PacmanLib: из теста можно вызвать функцию библиотеки, а main — нельзя
@@ -91,3 +93,6 @@ python automation/run_tests.py
 ```powershell
 .\build\bin\Debug\PacmanTestRunner.exe
 ```
+
+что покрыто: разбор `config.json` — чтение заголовка и размеров окна, отсутствующий ключ
+(сообщение об ошибке должно называть ключ), неверный тип значения
