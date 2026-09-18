@@ -24,3 +24,11 @@ jobs:
 
       - name: Check formatting
         run: python automation/format_files.py --check
+
+      - name: Upload game
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-release
+          path: |
+            build/Release/game.exe
+            config.json
