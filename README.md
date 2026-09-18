@@ -74,3 +74,20 @@ project/
 ```
 
 Логика вынесена в PacmanLib: из теста можно вызвать функцию библиотеки, а main — нельзя
+
+## Тесты
+
+тесты лежат в `src/Pacman/Tests/`, собираются в цель `PacmanTestRunner` и линкуют `PacmanLib` —
+ту же библиотеку, что игра
+
+запуск через CTest (сборка Debug выполняется автоматически)
+
+```powershell
+python automation/run_tests.py
+```
+
+или напрямую, если проект уже собран
+
+```powershell
+.\build\bin\Debug\PacmanTestRunner.exe
+```
