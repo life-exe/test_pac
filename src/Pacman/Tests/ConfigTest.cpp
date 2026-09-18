@@ -34,9 +34,16 @@ TEST(ConfigTest, ShouldNameMissingKey)
     }
 }
 
-TEST(ConfigTest, ShouldRejectWrongValueType)
+TEST(ConfigTest, ShouldRejectInvalidJson)
 {
     std::istringstream input{R"({"title": "Pac-Man", "window 600}})"};
+
+    EXPECT_THROW(parseConfig(input), std::runtime_error);
+}
+
+TEST(ConfigTest, ShouldRejectWrongValueType)
+{
+    std::istringstream input{R"({"title": "Pac-Man", "window": {"width": "800", "height": 600}})"};
 
     EXPECT_THROW(parseConfig(input), std::runtime_error);
 }
