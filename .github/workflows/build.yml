@@ -19,6 +19,9 @@ jobs:
       - name: Build Debug
         run: python automation/build_debug.py
 
+      - name: Tests under AddressSanitizer
+        run: python automation/run_asan.py
+
       - name: Run tests
         run: python automation/run_tests.py
 
@@ -60,9 +63,6 @@ jobs:
 
       - name: Static analysis
         run: python automation/run_tidy.py
-
-      - name: Tests under AddressSanitizer
-        run: python automation/run_asan.py
 
       - name: Upload game
         uses: actions/upload-artifact@v4
