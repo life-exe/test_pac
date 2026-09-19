@@ -19,5 +19,9 @@ add_executable(${PROJECT_NAME}TestRunner Tests/ConfigTest.cpp)
 target_link_libraries(${PROJECT_NAME}TestRunner PRIVATE ${PROJECT_NAME}Lib GTest::gtest_main)
 set_target_properties(${PROJECT_NAME}TestRunner PROPERTIES FOLDER ${PROJECT_NAME})
 
+set_project_warnings(${PROJECT_NAME}Lib)
+set_project_warnings(${PROJECT_NAME})
+set_project_warnings(${PROJECT_NAME}TestRunner)
+
 include(GoogleTest)
 gtest_discover_tests(${PROJECT_NAME}TestRunner)
