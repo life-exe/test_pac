@@ -48,14 +48,4 @@ GameConfig parseConfig(std::istream& input)
     }
 }
 
-std::string spoiled(std::string value)
-{
-    std::string copy = "";
-    for (int i = 0; i < value.size(); i++)
-    {
-        copy += value[i];
-    }
-    return copy;
-}
-
 }  // namespace LifeExe
