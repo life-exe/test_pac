@@ -23,5 +23,9 @@ set_project_warnings(${PROJECT_NAME}Lib)
 set_project_warnings(${PROJECT_NAME})
 set_project_warnings(${PROJECT_NAME}TestRunner)
 
+enable_sanitizers(${PROJECT_NAME}Lib)
+enable_sanitizers(${PROJECT_NAME})
+enable_sanitizers(${PROJECT_NAME}TestRunner)
+
 include(GoogleTest)
 gtest_discover_tests(${PROJECT_NAME}TestRunner)
