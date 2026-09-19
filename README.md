@@ -55,6 +55,7 @@ python automation/format_files.py
 - измерение покрытия с порогом 70% (`run_coverage.py --min 70`)
 - сборка Release (`build_release.py`)
 - проверка стиля (`format_files.py --check`)
+- статический анализ (`run_tidy.py`)
 
 результат каждого запуска — на вкладке **Actions**, статус последнего коммита виден в бейдже выше
 
@@ -129,3 +130,32 @@ python automation/run_coverage.py --min 70
 
 измеряется только Debug: в Release оптимизатор переставляет и выбрасывает строки, и отчёт
 по нему вводит в заблуждение
+
+## Статический анализ
+
+предупреждения компилятора включены на полный уровень и считаются ошибками: `/W4 /WX /permissive-`
+для MSVC, `-Wall -Wextra -Wpedantic -Werror` для GCC и Clang
+
+настройка живёт в `cmake/CompilerWarnings.cmake` — функция `set_project_warnings(<target>)`,
+она применяется ко всем трём целям: `PacmanLib`, `Pacman`, `PacmanTestRunner`
+
+поверх компилятора работает [clang-tidy](https://clang.llvm.org/extra/clang-tidy/) — он идёт
+в составе Visual Studio и запускается через code analysis MSBuild, поэтому база компиляции
+(`compile_commands.json`) не нужна: флаги каждого файла MSBuild передаёт сам
+
+прогон анализа (сборка Debug выполняется автоматически)
+
+```powershell
+python automation/run_tidy.py
+```
+
+обычная сборка clang-tidy не запускает — анализ вынесен в отдельную команду, полный прогон
+занимает 15–20 секунд
+
+правила заданы файлом `.clang-tidy`: включены семейства `bugprone-*`, `performance-*`,
+`modernize-*`, `readability-*` и `misc-const-correctness`, отдельные вкусовые проверки выключены
+минусом; `WarningsAsErrors: '*'` делает любую находку ошибкой, поэтому анализ либо проходит
+целиком, либо падает — предупреждения не накапливаются
+
+находки в заголовках nlohmann_json и gtest не показываются: `HeaderFilterRegex` ограничивает
+сообщения нашими исходниками
