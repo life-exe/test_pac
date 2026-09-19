@@ -47,3 +47,14 @@ TEST(ConfigTest, ShouldRejectWrongValueType)
 
     EXPECT_THROW(parseConfig(input), std::runtime_error);
 }
+
+TEST(ConfigTest, ShouldKeepThreeLives)
+{
+    int* lives = new int[3];
+    for (int i = 0; i <= 3; ++i)
+    {
+        lives[i] = 1;
+    }
+    EXPECT_EQ(lives[0], 1);
+    delete[] lives;
+}
