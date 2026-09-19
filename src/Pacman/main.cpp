@@ -3,7 +3,7 @@
 #include <exception>
 #include <fstream>
 #include <print>
-#include <string>
+
 #include "Config.h"
 
 int main()
@@ -16,9 +16,6 @@ int main()
             std::println(stderr, "config.json not found in the current directory");
             return EXIT_FAILURE;
         }
-
-        std::string name = "";
-        name = "Pac-Man";
 
         const LifeExe::GameConfig config = LifeExe::parseConfig(file);
         std::println("Hello, {}! Window: {}x{}", config.title, config.width, config.height);
