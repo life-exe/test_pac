@@ -8,8 +8,7 @@ namespace LifeExe
 {
 
 /// Game settings read from config.json at startup.
-struct GameConfig
-{
+struct GameConfig{
     std::string title;  ///< Window title.
     int width{0};       ///< Window width in pixels.
     int height{0};      ///< Window height in pixels.
