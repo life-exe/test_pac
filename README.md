@@ -11,6 +11,11 @@
 
 ## Требования
 
+Проект собирается на Windows (MSVC) и на Linux (GCC 14); на Windows Linux
+доступен через [WSL](https://learn.microsoft.com/windows/wsl/install).
+
+### Windows
+
 | Компонент | Версия | Примечание |
 |---|---|---|
 | Windows | 10 или 11 | |
@@ -22,6 +27,21 @@
 | Doxygen | любая | только для сборки документации: `winget install --id DimitriVanHeesch.Doxygen` |
 | MkDocs | закреплена | только для сборки документации: `pip install -r requirements-docs.txt` |
 
+### Linux
+
+Ubuntu 24.04 или совместимый дистрибутив. GCC 14 нужен из-за `std::print`:
+в Ubuntu 24.04 `g++` — это GCC 13, поэтому профили Conan вызывают `g++-14`
+явно.
+
+```bash
+sudo apt install -y g++-14 cmake make clang-tidy clang-format pipx
+pipx install conan
+pipx ensurepath
+```
+
+Покрытие на Linux не измеряется: `run_coverage.py` печатает
+`coverage is measured on Windows only, skipping` и завершается с кодом `0`.
+
 ## Сборка и запуск
 
 ```powershell
@@ -30,11 +50,22 @@ python automation/build_debug.py
 .\build\bin\Debug\Pacman.exe
 ```
 
+На Linux — те же скрипты, командой `python3`:
+
+```bash
+python3 automation/generate_project_files.py
+python3 automation/build_debug.py
+./build/Debug/bin/Pacman
+```
+
 Запускать из корня проекта: `config.json` читается из текущего каталога, а не
 из каталога с исполняемым файлом.
 
 Сборка Release — `python automation/build_release.py`, результат в
-`build\bin\Release\Pacman.exe`.
+`build\bin\Release\Pacman.exe` на Windows и `build/Release/bin/Pacman` на
+Linux. Раскладка каталогов различается потому, что генератор Visual Studio
+держит обе конфигурации в одном дереве сборки, а Makefile — по одной на
+дерево; различие спрятано в `automation/common.py`.
 
 ## Тесты
 
@@ -42,7 +73,7 @@ python automation/build_debug.py
 |---|---|
 | `python automation/run_tests.py` | прогоняет тесты через CTest, сборка Debug выполняется автоматически |
 | `python automation/run_coverage.py --min 70` | измеряет покрытие под OpenCppCoverage, возвращает код 1 ниже порога |
-| `python automation/run_asan.py` | собирает отдельную сборку `build-asan` и прогоняет тесты под AddressSanitizer |
+| `python automation/run_asan.py` | собирает отдельную сборку `build-asan` и прогоняет тесты под AddressSanitizer; на Linux вместе с ним включается UndefinedBehaviorSanitizer |
 
 Тесты лежат в `src/Pacman/Tests/` и собираются в цель `PacmanTestRunner`.
 Отчёты покрытия — `build/coverage/html/index.html` и
@@ -89,26 +120,33 @@ project/
 ├── automation/                 # скрипты сборки, тестов и проверок
 ├── cmake/                      # модули: предупреждения, санитайзеры, формат
 ├── docs/                       # страницы сайта документации
-├── profiles/                   # профили Conan
+├── profiles/                   # профили Conan: windows-msvc-*, linux-gcc-*: windows-msvc-*, linux-gcc-*
 ├── src/Pacman/                 # подпроект игры: цели Pacman, PacmanLib, PacmanTestRunner
 └── .github/workflows/build.yml # CI
 ```
 
 ## CI
 
-Каждый push в `master` и каждый pull request проверяются на чистой машине
-`windows-latest` через GitHub Actions. Проверок четыре, по одной на предмет:
-упавшее форматирование больше не скрывает результат тестов.
+Каждый push в `master` и каждый pull request проверяются на чистых машинах
+`windows-latest` и `ubuntu-latest` через GitHub Actions. У каждого workflow
+один предмет, платформа — вторая ось: упавшее форматирование больше не
+скрывает результат тестов, а ошибка одного компилятора — результат другого.
 
 | Workflow | Работы | Что проверяет | Артефакты |
 |---|---|---|---|
-| `build.yml` | `build-Debug`, `build-Release` | сборка обеих конфигураций матрицей, параллельно | `game-Debug`, `game-Release` |
-| `tests.yml` | `tests` | тесты под AddressSanitizer, тесты, покрытие с порогом 70% | `coverage-report`, `test-report` |
-| `code-quality.yml` | `code-quality` | форматирование (`clang-format`), статический анализ (`clang-tidy`) | — |
+| `build.yml` | `build-Debug`, `build-Release`, `linux-Debug`, `linux-Release` | сборка обеих конфигураций матрицей, параллельно, на двух платформах | `game-Debug`, `game-Release`, `game-linux-Debug`, `game-linux-Release` |
+| `tests.yml` | `tests`, `linux-tests` | тесты под санитайзерами, тесты, покрытие с порогом 70% (только Windows) | `coverage-report`, `test-report` |
+| `code-quality.yml` | `code-quality`, `linux-tidy` | форматирование (`clang-format`), статический анализ (`clang-tidy`) | — |
 | `docs.yml` | `docs` | сборка документации и публикация на GitHub Pages | — |
 
+Слияние в `master` требует зелёного результата всех девяти работ; правило
+защиты ветки описано в `protection.json`. Работы Linux завершаются заметно
+быстрее: образ меньше, диск быстрее, а Makefile легче проектной модели
+MSBuild.
+
 Артефакты `game-Debug` и `game-Release` содержат `Pacman.exe` соответствующей
-конфигурации и `config.json`, готовые к запуску. `coverage-report` — HTML-отчёт
+конфигурации и `config.json`, готовые к запуску; `game-linux-*` — то же для
+Linux, исполняемый файл без расширения. `coverage-report` — HTML-отчёт
 о покрытии, `test-report` — отчёт тестов в формате JUnit; таблица покрытия и
 результаты тестов попадают в раздел **Summary** страницы прогона `tests`.
 

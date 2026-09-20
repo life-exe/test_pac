@@ -37,7 +37,11 @@ function(enable_sanitizers target)
                 COMMENT "Copying AddressSanitizer runtime next to ${target}")
         endif()
     else()
-        target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        # UBSan reports and continues by default; make every finding fatal,
+        # otherwise a test with undefined behaviour still passes.
+        target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer)
+        # GCC needs the flag at link time too: it pulls in libasan/libubsan.
+        # Without it the instrumented objects fail to link (__asan_report_*).
         target_link_options(${target} PRIVATE -fsanitize=address,undefined)
     endif()
 endfunction()
