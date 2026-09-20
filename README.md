@@ -1,6 +1,9 @@
 # Pacman
 
 [![build](https://github.com/life-exe/test_pac/actions/workflows/build.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/build.yml)
+[![tests](https://github.com/life-exe/test_pac/actions/workflows/tests.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/tests.yml)
+[![code-quality](https://github.com/life-exe/test_pac/actions/workflows/code-quality.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/code-quality.yml)
+[![docs](https://github.com/life-exe/test_pac/actions/workflows/docs.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/docs.yml)
 
 Игра Pac-Man на C++ — учебный проект курса по инженерному C++. Логика вынесена
 в библиотеку `PacmanLib`, исполняемый файл и тесты линкуют одну и ту же
@@ -93,18 +96,23 @@ project/
 
 ## CI
 
-Каждый push и pull request собирается на чистой машине `windows-latest` через
-GitHub Actions; описание — `.github/workflows/build.yml`. Прогон выполняет
-генерацию файлов проекта, сборку Debug, тесты под AddressSanitizer, обычные
-тесты, измерение покрытия с порогом 70%, сборку Release, проверку
-форматирования и статический анализ.
+Каждый push в `master` и каждый pull request проверяются на чистой машине
+`windows-latest` через GitHub Actions. Проверок четыре, по одной на предмет:
+упавшее форматирование больше не скрывает результат тестов.
 
-Статус последнего коммита виден в значке выше, подробности прогона — на вкладке
-**Actions**. Таблица покрытия и результаты тестов попадают в раздел
-**Summary** страницы прогона.
+| Workflow | Работы | Что проверяет | Артефакты |
+|---|---|---|---|
+| `build.yml` | `build-Debug`, `build-Release` | сборка обеих конфигураций матрицей, параллельно | `game-Debug`, `game-Release` |
+| `tests.yml` | `tests` | тесты под AddressSanitizer, тесты, покрытие с порогом 70% | `coverage-report`, `test-report` |
+| `code-quality.yml` | `code-quality` | форматирование (`clang-format`), статический анализ (`clang-tidy`) | — |
+| `docs.yml` | `docs` | сборка документации и публикация на GitHub Pages | — |
 
-Артефакты страницы прогона:
+Артефакты `game-Debug` и `game-Release` содержат `Pacman.exe` соответствующей
+конфигурации и `config.json`, готовые к запуску. `coverage-report` — HTML-отчёт
+о покрытии, `test-report` — отчёт тестов в формате JUnit; таблица покрытия и
+результаты тестов попадают в раздел **Summary** страницы прогона `tests`.
 
-- `game-release` — `Pacman.exe` и `config.json`, готовые к запуску;
-- `coverage-report` — HTML-отчёт о покрытии;
-- `test-report` — отчёт тестов в формате JUnit.
+Статус последнего коммита виден в значках выше — каждый ведёт на свой список
+прогонов на вкладке **Actions**. Пакеты Conan кэшируются между прогонами по
+хэшу `conanfile.txt` и профилей, поэтому повторный прогон не собирает
+зависимости заново.
