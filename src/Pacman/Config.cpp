@@ -11,7 +11,8 @@ namespace LifeExe
 
 namespace
 {
-const nlohmann::json& require(const nlohmann::json& object, std::string_view key) {
+const nlohmann::json& require(const nlohmann::json& object, std::string_view key)
+{
     if (!object.contains(key))
     {
         throw std::runtime_error(std::format("config: key '{}' is missing", key));
