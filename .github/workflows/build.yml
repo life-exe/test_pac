@@ -71,4 +71,28 @@ jobs:
           path: |
             build/bin/Release/Pacman.exe
             config.json
-      
+  docs:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Doxygen
+        run: choco install doxygen.install -y --no-progress
+      - name: Install MkDocs
+        run: pip install -r requirements-docs.txt
+      - name: Build documentation
+        run: python automation/build_docs.py
+      - name: Upload documentation
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/docs/site
+      - name: Publish to GitHub Pages
+        id: deployment
+        if: github.event_name == 'push' && github.ref_name == github.event.repository.default_branch
+        uses: actions/deploy-pages@v4
