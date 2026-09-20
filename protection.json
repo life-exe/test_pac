@@ -1,7 +1,17 @@
 {
   "required_status_checks": {
     "strict": false,
-    "contexts": ["build-Debug", "build-Release", "tests", "code-quality", "docs"]
+    "contexts": [
+      "build-Debug",
+      "build-Release",
+      "tests",
+      "code-quality",
+      "docs",
+      "linux-Debug",
+      "linux-Release",
+      "linux-tests",
+      "linux-tidy"
+    ]
   },
   "enforce_admins": true,
   "required_pull_request_reviews": null,
