@@ -57,6 +57,23 @@ python automation/build_debug.py
 
 ## Документация
 
+Опубликованный сайт — <https://life-exe.github.io/test_pac/>: архитектура,
+разработка и справочник API.
+
+Собрать локально:
+
+```powershell
+python automation/build_docs.py
+python automation/build_docs.py --serve   # предпросмотр на http://127.0.0.1:8000
+```
+
+Справочник API собирает Doxygen из комментариев `///` в заголовках
+`src/Pacman/*.h` по настройкам из `Doxyfile`; страницы о проекте собирает
+MkDocs из Markdown в `docs/` по описанию в `mkdocs.yml`. Оба шага выполняет
+`build_docs.py`, результат — в `build/docs/site`. Недокументированная
+публичная сущность и битая ссылка считаются ошибками, поэтому документация
+проверяется в CI работой `docs`.
+
 ## Структура проекта
 
 ```text
