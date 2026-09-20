@@ -1,4 +1,4 @@
-name: build
+name: code-quality
 
 on:
   push:
@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  code-quality:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,16 +21,8 @@ jobs:
       - name: Generate project files
         run: python automation/generate_project_files.py
 
-      - name: Build Debug
-        run: python automation/build_debug.py
+      - name: Check formatting
+        run: python automation/format_files.py --check
 
-      - name: Build Release
-        run: python automation/build_release.py
-
-      - name: Upload game
-        uses: actions/upload-artifact@v4
-        with:
-          name: game-release
-          path: |
-            build/bin/Release/Pacman.exe
-            config.json
+      - name: Static analysis
+        run: python automation/run_tidy.py
