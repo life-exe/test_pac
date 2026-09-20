@@ -3,7 +3,7 @@
     "strict": false,
     "contexts": ["build-Debug", "build-Release", "tests", "code-quality", "docs"]
   },
-  "enforce_admins": false,
+  "enforce_admins": true,
   "required_pull_request_reviews": null,
   "restrictions": null
 }
