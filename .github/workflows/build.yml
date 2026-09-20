@@ -11,7 +11,16 @@ concurrency:
 
 jobs:
   build:
+    name: build-${{ matrix.configuration }}
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - configuration: Debug
+            script: build_debug.py
+          - configuration: Release
+            script: build_release.py
     steps:
       - uses: actions/checkout@v4
 
@@ -21,16 +30,13 @@ jobs:
       - name: Generate project files
         run: python automation/generate_project_files.py
 
-      - name: Build Debug
-        run: python automation/build_debug.py
-
-      - name: Build Release
-        run: python automation/build_release.py
+      - name: Build ${{ matrix.configuration }}
+        run: python automation/${{ matrix.script }}
 
       - name: Upload game
         uses: actions/upload-artifact@v4
         with:
-          name: game-release
+          name: game-${{ matrix.configuration }}
           path: |
-            build/bin/Release/Pacman.exe
+            build/bin/${{ matrix.configuration }}/Pacman.exe
             config.json
