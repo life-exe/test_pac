@@ -28,4 +28,4 @@ enable_sanitizers(${PROJECT_NAME})
 enable_sanitizers(${PROJECT_NAME}TestRunner)
 
 include(GoogleTest)
-gtest_discover_tests(${PROJECT_NAME}TestRunner)
+gtest_discover_tests(${PROJECT_NAME}TestRunner DISCOVERY_TIMEOUT 30)
