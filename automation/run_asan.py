@@ -7,9 +7,10 @@ Usage:
     python automation/run_asan.py
 """
 
-from common import PROJECT_ROOT, cmake_build, configure, ensure_generated, relative, run
+from common import build_dir, cmake_build, configure, ensure_generated, relative, run
 
-ASAN_BUILD_DIR = PROJECT_ROOT / "build-asan"
+# build-asan/ on Windows, build-asan/Debug on Linux: same layout as build/.
+ASAN_BUILD_DIR = build_dir("Debug", root="build-asan")
 
 ensure_generated("Debug")
 configure("Debug", build_tree=ASAN_BUILD_DIR, extra=["-DENABLE_ASAN=ON"])
