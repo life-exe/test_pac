@@ -37,9 +37,14 @@ def profile(configuration: str) -> str:
     return f"profiles/{platform}-{configuration.lower()}"
 
 
-def build_dir(configuration: str) -> Path:
-    """Build tree for a configuration: one shared tree on Windows, one per configuration on Linux."""
-    return PROJECT_ROOT / "build" if IS_WINDOWS else PROJECT_ROOT / "build" / configuration
+def build_dir(configuration: str, root: str = "build") -> Path:
+    """Build tree for a configuration: one shared tree on Windows, one per configuration on Linux.
+
+    `root` is the tree's top directory; the sanitizer build uses "build-asan".
+    Keeping the platforms apart matters even for one machine: a project on C:
+    is visible from WSL as /mnt/c, and CMakeCache.txt remembers absolute paths.
+    """
+    return PROJECT_ROOT / root if IS_WINDOWS else PROJECT_ROOT / root / configuration
 
 
 def bin_dir(configuration: str) -> Path:
