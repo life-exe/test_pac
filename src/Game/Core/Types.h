@@ -1,11 +1,12 @@
 #pragma once
 
+#include <cstdint>
 #include <string_view>
 
-namespace Game::Core
+namespace LifeExe::Core
 {
 
-enum class GameState
+enum class GameState : std::uint8_t
 {
     Playing = 0,
     Paused,
@@ -23,4 +24,4 @@ constexpr std::string_view toString(GameState state)
     return "Unknown";
 }
 
-}  // namespace Game::Core
+}  // namespace LifeExe::Core

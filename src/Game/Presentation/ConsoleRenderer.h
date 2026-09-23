@@ -1,9 +1,8 @@
 #pragma once
 
-#include <iostream>
 #include "Game.h"
 
-namespace Game::Presentation
+namespace LifeExe::Presentation
 {
 
 class ConsoleRenderer
@@ -13,4 +12,4 @@ public:
     void render(const Core::Game& game) const;
 };
 
-}  // namespace Game::Presentation
+}  // namespace LifeExe::Presentation
