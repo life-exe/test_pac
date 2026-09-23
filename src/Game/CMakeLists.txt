@@ -11,9 +11,14 @@ target_include_directories(GameCore PUBLIC Core)
 add_library(GamePresentation STATIC
     Presentation/ConsoleRenderer.h
     Presentation/ConsoleRenderer.cpp
+    Presentation/SdlRenderer.h
+    Presentation/SdlRenderer.cpp
 )
+find_package(SDL3 REQUIRED)
 target_include_directories(GamePresentation PUBLIC Presentation)
-target_link_libraries(GamePresentation PUBLIC GameCore)
+target_link_libraries(GamePresentation PUBLIC GameCore PRIVATE SDL3::SDL3)
+target_compile_definitions(GamePresentation PRIVATE SDL_MAIN_HANDLED)
+target_precompile_headers(GamePresentation PRIVATE <SDL3/SDL.h>)
 
 # --- 3. GameApp (executable entry point) ---
 add_executable(GameApp
