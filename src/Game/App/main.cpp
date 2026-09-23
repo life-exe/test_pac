@@ -5,6 +5,8 @@
 #include "ConsoleRenderer.h"
 #include "Game.h"
 #include "Timer.h"
+#include <fstream>
+#include "Config.h"
 
 using namespace LifeExe;
 
@@ -35,7 +37,11 @@ void processInput(Core::Game& game, int frame)
 
 int main()
 {
-    std::println("Starting Game with Fixed Timestep Game Loop...");
+    std::ifstream configFile{"config.json"};
+    const LifeExe::GameConfig config{configFile.is_open()
+                                         ? LifeExe::parseConfig(configFile)
+                                         : LifeExe::GameConfig{.title = "LifeExe Game Framework", .width = 800, .height = 600}};
+    std::println("Starting {} ({}x{})...", config.title, config.width, config.height);
 
     Core::Game game;
     const Presentation::ConsoleRenderer renderer;

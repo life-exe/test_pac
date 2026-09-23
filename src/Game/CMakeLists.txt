@@ -21,7 +21,7 @@ add_executable(GameApp
     App/main.cpp
 )
 target_include_directories(GameApp PRIVATE App)
-target_link_libraries(GameApp PRIVATE GamePresentation GameCore)
+target_link_libraries(GameApp PRIVATE GamePresentation GameCore Common)
 
 # --- 4. GameTests (core unit tests) ---
 add_executable(GameTests
