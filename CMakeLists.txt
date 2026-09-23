@@ -19,7 +19,9 @@ include(cmake/CompilerWarnings.cmake)
 include(cmake/Sanitizers.cmake)
 
 add_subdirectory(src/Pacman)
+# set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Pacman)
 
-set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Pacman)
+add_subdirectory(src/Game)                                                                                                    
+set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT GameApp) 
 
 include(cmake/ClangFormat.cmake)

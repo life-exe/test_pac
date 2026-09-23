@@ -65,11 +65,12 @@ def main() -> None:
     COVERAGE_DIR.mkdir(parents=True, exist_ok=True)
     run([
         tool, "--quiet",
-        "--sources", str(PROJECT_ROOT / "src" / "Pacman"),
+        "--cover_children",
+        "--sources", str(PROJECT_ROOT / "src"),
         "--excluded_sources", "*\\Tests\\*",
         "--export_type", f"html:{COVERAGE_DIR / 'html'}",
         "--export_type", f"cobertura:{REPORT_XML}",
-        "--", str(TEST_RUNNER),
+        "--", "ctest", "--test-dir", str(build_dir("Debug")), "-C", "Debug", "--output-on-failure",
     ])
 
     total, rows = coverage_table()
