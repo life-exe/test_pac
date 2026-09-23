@@ -6,10 +6,10 @@ PROJECT_BRIEF          = "Game logic library and executable"
 # Output goes inside the MkDocs docs_dir so the site picks it up as api/.
 # docs/api is generated and listed in .gitignore.
 OUTPUT_DIRECTORY       = docs
-INPUT                  = src/Pacman
+INPUT                  = src/Common
 FILE_PATTERNS          = *.h
 RECURSIVE              = NO
-EXCLUDE                = src/Pacman/Tests
+EXCLUDE                = src/Common/Tests
 
 # Only what is documented on purpose: an undocumented public entity is an error.
 EXTRACT_ALL            = NO
