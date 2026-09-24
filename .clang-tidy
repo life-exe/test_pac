@@ -1,4 +1,4 @@
-Checks: '-*,bugprone-*,-bugprone-exception-escape,performance-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-nodiscard,readability-*,-readability-magic-numbers,-readability-identifier-length,-readability-uppercase-literal-suffix,misc-const-correctness'
-WarningsAsErrors: '*'
-HeaderFilterRegex: 'src[/\\](Pacman|Game)[/\\].*'
+Checks: '-*,bugprone-*,-bugprone-exception-escape,performance-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-nodiscard,readability-*,-readability-magic-numbers,-readability-identifier-length,-readability-uppercase-literal-suffix,misc-const-correctness,-clang-diagnostic-ignored-gch'               
+WarningsAsErrors: '*'                                                                                                                                            
+HeaderFilterRegex: 'src[/\\](Pacman|Game)[/\\].*'                                                                                                                
 FormatStyle: file
