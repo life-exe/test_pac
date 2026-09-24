@@ -25,4 +25,4 @@ if IS_WINDOWS:
 else:
     cmake_build(build_dir("Debug"), "Debug")  # generated headers and the database must exist
     sources = sorted((PROJECT_ROOT / "src").rglob("*.cpp"))
-    run(["clang-tidy", "-p", relative(build_dir("Debug")), *(relative(s) for s in sources)])
+    run(["clang-tidy", "-p", relative(build_dir("Debug")), "--extra-arg=-Wno-ignored-gch", *(relative(s) for s in sources)]) 
