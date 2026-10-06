@@ -27,6 +27,15 @@ jobs:
       - name: Install Conan
         run: pip install conan
 
+      - name: Show toolchain
+        run: |
+          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property displayName
+          (Get-Command clang-format).Source
+          clang-format --version
+          cmake --version
+          conan profile detect --name ci-detected
+          conan profile show -pr:h profiles/windows-msvc-debug -pr:b profiles/windows-msvc-debug
+
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
