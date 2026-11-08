@@ -1,12 +1,12 @@
-# Pacman
+# App
 
 [![build](https://github.com/life-exe/test_pac/actions/workflows/build.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/build.yml)
 [![tests](https://github.com/life-exe/test_pac/actions/workflows/tests.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/tests.yml)
 [![code-quality](https://github.com/life-exe/test_pac/actions/workflows/code-quality.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/code-quality.yml)
 [![docs](https://github.com/life-exe/test_pac/actions/workflows/docs.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/docs.yml)
 
-Игра Pac-Man на C++ — учебный проект курса по инженерному C++. Логика вынесена
-в библиотеку `PacmanLib`, исполняемый файл и тесты линкуют одну и ту же
+Приложение на C++ — учебный проект курса по инженерному C++. Логика вынесена
+в библиотеку `AppLib`, исполняемый файл и тесты линкуют одну и ту же
 библиотеку. Настройки окна читаются из `config.json` при запуске.
 
 ## Требования
@@ -47,7 +47,7 @@ pipx ensurepath
 ```powershell
 python automation/generate_project_files.py
 python automation/build_debug.py
-.\build\bin\Debug\Pacman.exe
+.\build\bin\Debug\App.exe
 ```
 
 На Linux — те же скрипты, командой `python3`:
@@ -55,14 +55,14 @@ python automation/build_debug.py
 ```bash
 python3 automation/generate_project_files.py
 python3 automation/build_debug.py
-./build/Debug/bin/Pacman
+./build/Debug/bin/App
 ```
 
 Запускать из корня проекта: `config.json` читается из текущего каталога, а не
 из каталога с исполняемым файлом.
 
 Сборка Release — `python automation/build_release.py`, результат в
-`build\bin\Release\Pacman.exe` на Windows и `build/Release/bin/Pacman` на
+`build\bin\Release\App.exe` на Windows и `build/Release/bin/App` на
 Linux. Раскладка каталогов различается потому, что генератор Visual Studio
 держит обе конфигурации в одном дереве сборки, а Makefile — по одной на
 дерево; различие спрятано в `automation/common.py`.
@@ -79,7 +79,7 @@ Linux. Раскладка каталогов различается потому
 | `python automation/run_coverage.py --min 70` | измеряет покрытие под OpenCppCoverage, возвращает код 1 ниже порога |
 | `python automation/run_asan.py` | собирает отдельную сборку `build-asan` и прогоняет тесты под AddressSanitizer; на Linux вместе с ним включается UndefinedBehaviorSanitizer |
 
-Тесты лежат в `src/Pacman/Tests/` и собираются в цель `PacmanTestRunner`.
+Тесты лежат в `src/App/Tests/` и собираются в цель `AppTestRunner`.
 Отчёты покрытия — `build/coverage/html/index.html` и
 `build/coverage/coverage.xml`.
 
@@ -106,7 +106,7 @@ python automation/build_docs.py --serve   # предпросмотр на http:/
 ```
 
 Справочник API собирает Doxygen из комментариев `///` в заголовках
-`src/Pacman/*.h` по настройкам из `Doxyfile`; страницы о проекте собирает
+`src/App/*.h` по настройкам из `Doxyfile`; страницы о проекте собирает
 MkDocs из Markdown в `docs/` по описанию в `mkdocs.yml`. Оба шага выполняет
 `build_docs.py`, результат — в `build/docs/site`. Недокументированная
 публичная сущность и битая ссылка считаются ошибками, поэтому документация
@@ -127,7 +127,7 @@ project/
 ├── cmake/                      # модули: предупреждения, санитайзеры, формат
 ├── docs/                       # страницы сайта документации
 ├── profiles/                   # профили Conan: windows-msvc-*, linux-gcc-*
-├── src/Pacman/                 # подпроект игры: цели Pacman, PacmanLib, PacmanTestRunner
+├── src/App/                    # подпроект приложения: цели App, AppLib, AppTestRunner
 └── .github/workflows/build.yml # CI
 ```
 
@@ -150,7 +150,7 @@ project/
 быстрее: образ меньше, диск быстрее, а Makefile легче проектной модели
 MSBuild.
 
-Артефакты `game-Debug` и `game-Release` содержат `Pacman.exe` соответствующей
+Артефакты `game-Debug` и `game-Release` содержат `App.exe` соответствующей
 конфигурации и `config.json`, готовые к запуску; `game-linux-*` — то же для
 Linux, исполняемый файл без расширения. `coverage-report` — HTML-отчёт
 о покрытии, `test-report` — отчёт тестов в формате JUnit; таблица покрытия и
