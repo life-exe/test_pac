@@ -184,3 +184,8 @@ Linux, исполняемый файл без расширения. `coverage-re
 проверка не проходит из-за спецификации, скилл останавливается и сообщает об
 этом: `SCAFFOLD.md` правит человек.
 
+## Работа с AI-агентом
+
+правила репозитория описаны в AGENTS.md
+перед созданием Pull Request изменения проверяются скиллом /code-review (.claude/skills/code-review/SKILL.md)
+оформляются в коммит скиллом /smart-commit (.claude/skills/smart-commit/SKILL.md)
