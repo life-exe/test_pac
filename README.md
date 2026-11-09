@@ -186,6 +186,9 @@ Linux, исполняемый файл без расширения. `coverage-re
 
 ## Работа с AI-агентом
 
-правила репозитория описаны в AGENTS.md
-перед созданием Pull Request изменения проверяются скиллом /code-review (.claude/skills/code-review/SKILL.md)
-оформляются в коммит скиллом /smart-commit (.claude/skills/smart-commit/SKILL.md)
+## Работа с AI-агентом                                                                                                                                                         
+                                                                                                                                                                                   
+- Правила репозитория описаны в `AGENTS.md`.                                                                                                                                   
+- Перед созданием Pull Request изменения проверяются скиллом `/code-review` (`.claude/skills/code-review/SKILL.md`).                                                           
+- Атомарные коммиты оформляются скиллом `/smart-commit` (`.claude/skills/smart-commit/SKILL.md`).                                                                              
+- Описание и команды доставки Pull Request готовятся скиллом `/create-pr` (`.claude/skills/create-pr/SKILL.md`).     

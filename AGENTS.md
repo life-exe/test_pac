@@ -34,4 +34,4 @@
 ## Git и доставка изменений
 
 - Ветка `master` защищена (`protection.json`, `enforce_admins: true`): прямой `git push` в `master` запрещён.
-- Любые изменения доставляются через отдельную ветку, предкоммитное ревью скиллом `/code-review` и Pull Request (`gh pr create`, `gh pr checks --watch`, `gh pr merge --squash --delete-branch`).
+- Любые изменения доставляются через отдельную ветку, предкоммитное ревью скиллом `/code-review` и Pull Request (`gh pr create`, `gh pr checks --watch`, `gh pr merge --squash --delete-branch`).    
