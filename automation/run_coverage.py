@@ -1,6 +1,6 @@
 """Measure test coverage with OpenCppCoverage.
 
-Builds Debug, runs PacmanTestRunner under OpenCppCoverage and writes:
+Builds Debug, runs AppTestRunner under OpenCppCoverage and writes:
     build/coverage/html/index.html   -- report for humans
     build/coverage/coverage.xml      -- Cobertura XML for CI
 Prints a per-file table; on GitHub Actions appends it to the job summary.
@@ -21,7 +21,7 @@ from common import IS_WINDOWS, PROJECT_ROOT, bin_dir, build, build_dir, run
 KNOWN_PATHS = [Path(r"C:\Program Files\OpenCppCoverage\OpenCppCoverage.exe")]
 COVERAGE_DIR = build_dir("Debug") / "coverage"
 REPORT_XML = COVERAGE_DIR / "coverage.xml"
-TEST_RUNNER = bin_dir("Debug") / "PacmanTestRunner.exe"
+TEST_RUNNER = bin_dir("Debug") / "AppTestRunner.exe"
 
 
 def find_tool() -> str:

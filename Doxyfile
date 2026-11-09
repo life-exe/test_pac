@@ -1,7 +1,7 @@
 # Doxygen configuration. Only settings that differ from the defaults are
 # listed; `doxygen -g` would print all ~300 of them. Run from the project root.
 
-PROJECT_NAME           = Pacman
+PROJECT_NAME           = App
 PROJECT_BRIEF          = "Game logic library and executable"
 # Output goes inside the MkDocs docs_dir so the site picks it up as api/.
 # docs/api is generated and listed in .gitignore.

@@ -19,7 +19,7 @@ include(cmake/CompilerWarnings.cmake)
 include(cmake/Sanitizers.cmake)
 
 add_subdirectory(src/Common)                                                                                                                             
-add_subdirectory(src/Pacman)                                                                                                                             
+add_subdirectory(src/App)                                                                                                                             
 add_subdirectory(src/Game)                                                                                                                               
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT GameApp)  
 

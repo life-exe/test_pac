@@ -10,18 +10,18 @@ using namespace LifeExe;
 
 TEST(ConfigTest, ShouldReadTitleAndWindow)
 {
-    std::istringstream input{R"({"title": "Pac-Man", "window": {"width": 800, "height": 600}})"};
+    std::istringstream input{R"({"title": "App", "window": {"width": 800, "height": 600}})"};
 
     const GameConfig config = parseConfig(input);
 
-    EXPECT_EQ(config.title, "Pac-Man");
+    EXPECT_EQ(config.title, "App");
     EXPECT_EQ(config.width, 800);
     EXPECT_EQ(config.height, 600);
 }
 
 TEST(ConfigTest, ShouldNameMissingKey)
 {
-    std::istringstream input{R"({"title": "Pac-Man", "window": {"height": 600}})"};
+    std::istringstream input{R"({"title": "App", "window": {"height": 600}})"};
 
     try
     {
@@ -36,14 +36,14 @@ TEST(ConfigTest, ShouldNameMissingKey)
 
 TEST(ConfigTest, ShouldRejectInvalidJson)
 {
-    std::istringstream input{R"({"title": "Pac-Man", "window 600}})"};
+    std::istringstream input{R"({"title": "App", "window 600}})"};
 
     EXPECT_THROW(parseConfig(input), std::runtime_error);
 }
 
 TEST(ConfigTest, ShouldRejectWrongValueType)
 {
-    std::istringstream input{R"({"title": "Pac-Man", "window": {"width": "800", "height": 600}})"};
+    std::istringstream input{R"({"title": "App", "window": {"width": "800", "height": 600}})"};
 
     EXPECT_THROW(parseConfig(input), std::runtime_error);
 }

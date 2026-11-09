@@ -1,5 +1,5 @@
-site_name: Pacman
-site_description: Учебный проект курса «Инженерный C++ на реальной игре»
+site_name: App
+site_description: Учебный проект курса «Инженерный C++ для разработчиков игр»
 docs_dir: docs
 site_dir: build/docs/site
 theme:
