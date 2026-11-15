@@ -5,9 +5,10 @@
 [![code-quality](https://github.com/life-exe/test_pac/actions/workflows/code-quality.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/code-quality.yml)
 [![docs](https://github.com/life-exe/test_pac/actions/workflows/docs.yml/badge.svg)](https://github.com/life-exe/test_pac/actions/workflows/docs.yml)
 
-Приложение на C++ — учебный проект курса по инженерному C++. Логика вынесена
-в библиотеку `AppLib`, исполняемый файл и тесты линкуют одну и ту же
-библиотеку. Настройки окна читаются из `config.json` при запуске.
+Приложение на C++ — учебный проект курса по инженерному C++. Общая конфигурация
+вынесена в библиотеку `Common`, игровая логика — в `GameCore`; исполняемые
+файлы и тесты линкуют эти библиотеки. Настройки окна читаются из `config.json`
+при запуске.
 
 ## Требования
 
@@ -79,7 +80,7 @@ Linux. Раскладка каталогов различается потому
 | `python automation/run_coverage.py --min 70` | измеряет покрытие под OpenCppCoverage, возвращает код 1 ниже порога |
 | `python automation/run_asan.py` | собирает отдельную сборку `build-asan` и прогоняет тесты под AddressSanitizer; на Linux вместе с ним включается UndefinedBehaviorSanitizer |
 
-Тесты лежат в `src/App/Tests/` и собираются в цель `AppTestRunner`.
+Тесты лежат в `src/Common/Tests/` (`CommonTests`) и `src/Game/Tests/` (`GameTests`).
 Отчёты покрытия — `build/coverage/html/index.html` и
 `build/coverage/coverage.xml`.
 
@@ -106,7 +107,7 @@ python automation/build_docs.py --serve   # предпросмотр на http:/
 ```
 
 Справочник API собирает Doxygen из комментариев `///` в заголовках
-`src/App/*.h` по настройкам из `Doxyfile`; страницы о проекте собирает
+`src/Common/*.h` по настройкам из `Doxyfile`; страницы о проекте собирает
 MkDocs из Markdown в `docs/` по описанию в `mkdocs.yml`. Оба шага выполняет
 `build_docs.py`, результат — в `build/docs/site`. Недокументированная
 публичная сущность и битая ссылка считаются ошибками, поэтому документация
@@ -127,7 +128,10 @@ project/
 ├── cmake/                      # модули: предупреждения, санитайзеры, формат
 ├── docs/                       # страницы сайта документации
 ├── profiles/                   # профили Conan: windows-msvc-*, linux-gcc-*
-├── src/App/                    # подпроект приложения: цели App, AppLib, AppTestRunner
+├── src/
+│   ├── Common/                 # общая конфигурация: цели Common, CommonTests
+│   ├── App/                    # подпроект приложения: цель App
+│   └── Game/                   # игра: цели GameCore, GamePresentation, GameApp, GameTests
 └── .github/workflows/build.yml # CI
 ```
 

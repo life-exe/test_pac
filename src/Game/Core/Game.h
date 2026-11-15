@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Command.h"
 #include "GameSnapshot.h"
 #include "Types.h"
 
@@ -12,16 +13,18 @@ public:
     Game() = default;
 
     void update(float dt);
+    void handleCommand(Command command);
+    void reset();
 
     GameState state() const { return m_state; }
 
-    float totalTime() const { return m_totalTime; }
+    double totalTime() const { return m_totalTime; }
 
     GameSnapshot snapshot() const { return {.state = m_state, .totalTime = m_totalTime}; }
 
 private:
     GameState m_state{GameState::Playing};
-    float m_totalTime{0.0f};
+    double m_totalTime{0.0};
 };
 
 }  // namespace LifeExe::Core

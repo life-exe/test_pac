@@ -1,6 +1,7 @@
 # --- 1. GameCore (pure logic) ---
 add_library(GameCore STATIC
     Core/Types.h
+    Core/Command.h
     Core/GameSnapshot.h
     Core/Game.h
     Core/Game.cpp
@@ -17,9 +18,10 @@ target_link_libraries(GamePresentation PUBLIC GameCore)
 
 # --- 3. GameApp (executable entry point) ---
 add_executable(GameApp
+    App/Timer.h
     App/main.cpp
 )
-target_link_libraries(GameApp PRIVATE GamePresentation GameCore)
+target_link_libraries(GameApp PRIVATE GamePresentation GameCore Common)
 
 # --- 4. GameTests (core unit tests) ---
 add_executable(GameTests

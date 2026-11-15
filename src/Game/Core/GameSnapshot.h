@@ -9,7 +9,7 @@ namespace LifeExe::Core
 struct GameSnapshot
 {
     GameState state{GameState::Playing};
-    float totalTime{0.0f};
+    double totalTime{0.0};
 };
 
 }  // namespace LifeExe::Core
