@@ -1,9 +1,7 @@
-find_package(raylib REQUIRED)
-
 # --- 1. GameCore (pure logic) ---
 add_library(GameCore STATIC
     Core/Types.h
-    Core/Command.h
+    Core/GameSnapshot.h
     Core/Game.h
     Core/Game.cpp
 )
@@ -13,20 +11,15 @@ target_include_directories(GameCore PUBLIC Core)
 add_library(GamePresentation STATIC
     Presentation/ConsoleRenderer.h
     Presentation/ConsoleRenderer.cpp
-    Presentation/RaylibRenderer.h
-    Presentation/RaylibRenderer.cpp
 )
 target_include_directories(GamePresentation PUBLIC Presentation)
-target_link_libraries(GamePresentation PUBLIC GameCore PRIVATE raylib) 
-target_precompile_headers(GamePresentation PRIVATE <raylib.h>)
+target_link_libraries(GamePresentation PUBLIC GameCore)
 
 # --- 3. GameApp (executable entry point) ---
 add_executable(GameApp
-    App/Timer.h
     App/main.cpp
 )
-target_include_directories(GameApp PRIVATE App)
-target_link_libraries(GameApp PRIVATE GamePresentation GameCore Common)
+target_link_libraries(GameApp PRIVATE GamePresentation GameCore)
 
 # --- 4. GameTests (core unit tests) ---
 add_executable(GameTests
@@ -53,7 +46,3 @@ enable_sanitizers(GameTests)
 # --- CTest & GTest test discovery ---
 include(GoogleTest)
 gtest_discover_tests(GameTests DISCOVERY_TIMEOUT 30)
-
-if(MSVC)
-    target_link_options(GameApp PRIVATE /ignore:4099)
-endif()

@@ -1,47 +1,46 @@
-#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <exception>
 #include <print>
+#include "ConsoleRenderer.h"
 #include "Game.h"
-#include "Timer.h"
-#include <fstream>
-#include "Config.h"
-#include "RaylibRenderer.h"
-
-using namespace LifeExe;
 
 int main()
 {
-    std::ifstream configFile{"config.json"};
-    const LifeExe::GameConfig config{configFile.is_open()
-                                         ? LifeExe::parseConfig(configFile)
-                                         : LifeExe::GameConfig{.title = "LifeExe Game Framework", .width = 800, .height = 600}};
-    std::println("Starting {} ({}x{})...", config.title, config.width, config.height);
-
-    Core::Game game;
-    Presentation::RaylibRenderer renderer;
-    renderer.init(config.width, config.height, config.title);
-    App::Timer timer;
-
-    // Simulation parameters: 60 updates per second
-    constexpr float fixedDt{1.0f / 60.0f};
-    constexpr float maxFrameTime{0.25f};  // Spiral of death clamp
-    float accumulator{0.0f};
-
-    while (!renderer.shouldClose() && game.state() != Core::GameState::GameOver)
+    try
     {
-        renderer.processInput(game);
+        std::println("Starting Game...");
 
-        const float frameTime{std::min(timer.tick(), maxFrameTime)};
-        accumulator += frameTime;
+        LifeExe::Core::Game game;
+        const LifeExe::Presentation::ConsoleRenderer renderer;
 
-        while (accumulator >= fixedDt)
+        // Simulate game loop: 5 frames at 16 ms dt (~60 FPS)
+        constexpr float dt{0.016f};
+        for (int frame{0}; frame < 5; ++frame)
         {
-            game.update(fixedDt);
-            accumulator -= fixedDt;
+            if (game.state() != LifeExe::Core::GameState::Playing)
+            {
+                break;
+            }
+
+            game.update(dt);
+            renderer.render(game.snapshot());
         }
 
-        renderer.render(game);
+        std::println("Game finished successfully.");
     }
-    renderer.close();
-    std::println("Game loop finished successfully.");
-    return 0;
+    catch (const std::exception& e)
+    {
+        // Handlers use fputs: it cannot throw, so no exception escapes main
+        std::fputs(e.what(), stderr);
+        std::fputs("\n", stderr);
+        return EXIT_FAILURE;
+    }
+    catch (...)
+    {
+        std::fputs("unknown error\n", stderr);
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }

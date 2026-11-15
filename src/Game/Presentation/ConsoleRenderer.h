@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Game.h"
+#include "GameSnapshot.h"
 
 namespace LifeExe::Presentation
 {
@@ -8,8 +8,7 @@ namespace LifeExe::Presentation
 class ConsoleRenderer
 {
 public:
-    // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-    void render(const Core::Game& game) const;
+    void render(const Core::GameSnapshot& snapshot) const;
 };
 
 }  // namespace LifeExe::Presentation
