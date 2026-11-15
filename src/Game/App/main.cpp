@@ -1,33 +1,97 @@
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
+#include <fstream>
 #include <print>
+#include <thread>
+#include <vector>
+#include "Config.h"
 #include "ConsoleRenderer.h"
 #include "Game.h"
+#include "Timer.h"
+
+using namespace LifeExe;
+
+namespace
+{
+
+// Input layer only reports commands; delivering them to the core is the presenter's job
+std::vector<Core::Command> processInput(int frame)
+{
+    // Simulated input stream until real window/input provider is attached
+    if (frame == 3)
+    {
+        std::println(">>> Input Event: Pause");
+        return {Core::Command::Pause};
+    }
+    if (frame == 6)
+    {
+        std::println(">>> Input Event: Resume");
+        return {Core::Command::Resume};
+    }
+    if (frame == 9)
+    {
+        std::println(">>> Input Event: Quit");
+        return {Core::Command::Quit};
+    }
+    return {};
+}
+
+}  // namespace
 
 int main()
 {
     try
     {
-        std::println("Starting Game...");
+        std::ifstream configFile{"config.json"};
+        const LifeExe::GameConfig config{configFile.is_open()
+                                             ? LifeExe::parseConfig(configFile)
+                                             : LifeExe::GameConfig{.title = "LifeExe Game Framework", .width = 800, .height = 600}};
+        std::println("Starting {} ({}x{})...", config.title, config.width, config.height);
 
-        LifeExe::Core::Game game;
-        const LifeExe::Presentation::ConsoleRenderer renderer;
+        Core::Game game;
+        const Presentation::ConsoleRenderer renderer;
+        App::Timer timer;
 
-        // Simulate game loop: 5 frames at 16 ms dt (~60 FPS)
-        constexpr float dt{0.016f};
-        for (int frame{0}; frame < 5; ++frame)
+        // Simulation parameters: 60 updates per second
+        constexpr float fixedDt{1.0f / 60.0f};
+        constexpr float maxFrameTime{0.25f};  // Spiral of death clamp
+
+        float accumulator{0.0f};
+        int simulatedFrames{0};
+
+        // Run demonstration loop for 10 frames
+        while (game.state() != Core::GameState::GameOver && simulatedFrames < 10)
         {
-            if (game.state() != LifeExe::Core::GameState::Playing)
+            // 1. Measure real elapsed time and clamp against lag spikes
+            const float frameTime{std::min(timer.tick(), maxFrameTime)};
+            accumulator += frameTime;
+
+            // 2. Poll input and hand this frame's commands to the core
+            for (const Core::Command command : processInput(simulatedFrames))
             {
-                break;
+                game.handleCommand(command);
             }
 
-            game.update(dt);
+            // 3. Fixed timestep physics/logic update
+            while (accumulator >= fixedDt)
+            {
+                game.update(fixedDt);
+                accumulator -= fixedDt;
+            }
+
+            // 4. Render current frame from a state snapshot
             renderer.render(game.snapshot());
+
+            ++simulatedFrames;
+
+            // Emulate frame target ~60 FPS (16 ms)
+            std::this_thread::sleep_for(std::chrono::milliseconds{16});
         }
 
-        std::println("Game finished successfully.");
+        std::println("Game loop finished successfully.");
     }
     catch (const std::exception& e)
     {
