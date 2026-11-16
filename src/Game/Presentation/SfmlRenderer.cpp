@@ -80,7 +80,6 @@ std::vector<Core::Command> SfmlRenderer::processInput()
     return commands;
 }
 
-
 void SfmlRenderer::render(const Core::GameSnapshot& snapshot)
 {
     if (!m_window || !m_window->isOpen())
@@ -119,6 +118,5 @@ void SfmlRenderer::render(const Core::GameSnapshot& snapshot)
     // 4. Present frame
     m_window->display();
 }
-
 
 }  // namespace LifeExe::Presentation

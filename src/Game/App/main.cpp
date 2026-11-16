@@ -39,9 +39,9 @@ int main()
         while (!renderer.shouldClose() && game.state() != Core::GameState::GameOver)
         {
             for (const Core::Command command : renderer.processInput())
-{
-    game.handleCommand(command);
-}
+            {
+                game.handleCommand(command);
+            }
             const float frameTime{std::min(timer.tick(), maxFrameTime)};
             accumulator += frameTime;
 

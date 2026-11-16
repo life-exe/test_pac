@@ -26,9 +26,9 @@ public:
 
     bool init(int width, int height, const std::string& title);
     void close();
-    
+
     std::vector<Core::Command> processInput();
-[[nodiscard]] bool shouldClose() const;
+    [[nodiscard]] bool shouldClose() const;
 
     void render(const Core::GameSnapshot& snapshot);
 
