@@ -8,13 +8,19 @@ add_library(GameCore STATIC
 )
 target_include_directories(GameCore PUBLIC Core)
 
-# --- 2. GamePresentation (rendering and input) ---
+# --- Dependencies ---
+find_package(SFML REQUIRED COMPONENTS Graphics)
+
+# --- 2. GamePresentation (rendering & window backend) ---
 add_library(GamePresentation STATIC
     Presentation/ConsoleRenderer.h
     Presentation/ConsoleRenderer.cpp
+    Presentation/SfmlRenderer.h
+    Presentation/SfmlRenderer.cpp
 )
 target_include_directories(GamePresentation PUBLIC Presentation)
-target_link_libraries(GamePresentation PUBLIC GameCore)
+target_link_libraries(GamePresentation PUBLIC GameCore PRIVATE SFML::Graphics)
+ target_precompile_headers(GamePresentation PRIVATE <SFML/Graphics.hpp>)
 
 # --- 3. GameApp (executable entry point) ---
 add_executable(GameApp
