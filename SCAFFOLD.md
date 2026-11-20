@@ -247,7 +247,7 @@ AlwaysBreakTemplateDeclarations: Yes
 `.clang-tidy` целиком, с подстановкой имени в `HeaderFilterRegex`:
 
 ```yaml
-Checks: '-*,bugprone-*,performance-*,modernize-*,-modernize-use-trailing-return-type,readability-*,-readability-magic-numbers,-readability-identifier-length,misc-const-correctness'
+Checks: '-*,bugprone-*,performance-*,modernize-*,-modernize-use-trailing-return-type,-modernize-use-designated-initializers,readability-*,-readability-magic-numbers,-readability-identifier-length,misc-const-correctness'
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'src[/\\]<Name>[/\\].*'
 FormatStyle: file
