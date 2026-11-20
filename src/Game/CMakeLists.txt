@@ -31,6 +31,8 @@ target_link_libraries(GameApp PRIVATE GamePresentation GameCore Common)
 # --- 4. GameTests (core unit tests) ---
 add_executable(GameTests
     Tests/GameTest.cpp
+    Tests/TypesTest.cpp
+    Tests/Acceptance/KickoffAcceptanceTest.cpp
 )
 target_link_libraries(GameTests PRIVATE GameCore GTest::gtest_main)
 
