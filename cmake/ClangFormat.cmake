@@ -7,6 +7,9 @@ file(GLOB VS_LLVM_DIRS
     "C:/Program Files/Microsoft Visual Studio/*/*/VC/Tools/Llvm/x64/bin")
 
 # PATHS (not HINTS): PATH is searched first, so the pinned pip clang-format wins over Visual Studio.
+if(CLANG_FORMAT_EXE AND NOT EXISTS "${CLANG_FORMAT_EXE}")
+    unset(CLANG_FORMAT_EXE CACHE)
+endif()
 find_program(CLANG_FORMAT_EXE NAMES clang-format PATHS ${VS_LLVM_DIRS})
 
 if(NOT CLANG_FORMAT_EXE)
