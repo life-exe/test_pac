@@ -44,7 +44,7 @@ jobs:
         with:
           name: game-${{ matrix.configuration }}
           path: |
-            build/bin/${{ matrix.configuration }}/App.exe
+            build/bin/${{ matrix.configuration }}/GameApp.exe
             config.json
 
   linux:
@@ -84,5 +84,5 @@ jobs:
         with:
           name: game-linux-${{ matrix.configuration }}
           path: |
-            build/${{ matrix.configuration }}/bin/App
+            build/${{ matrix.configuration }}/bin/GameApp
             config.json
