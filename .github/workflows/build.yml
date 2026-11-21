@@ -39,13 +39,17 @@ jobs:
       - name: Build ${{ matrix.configuration }}
         run: python automation/${{ matrix.script }}
 
+      - name: Package game
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/bin/${{ matrix.configuration }}/GameApp.exe dist/
+          Copy-Item config.json dist/
+
       - name: Upload game
         uses: actions/upload-artifact@v4
         with:
           name: game-${{ matrix.configuration }}
-          path: |
-            build/bin/${{ matrix.configuration }}/GameApp.exe
-            config.json
+          path: dist/
 
   linux:
     name: linux-${{ matrix.configuration }}
@@ -79,10 +83,14 @@ jobs:
       - name: Build ${{ matrix.configuration }}
         run: python3 automation/${{ matrix.script }}
 
+      - name: Package game
+        run: |
+          mkdir -p dist
+          cp build/${{ matrix.configuration }}/bin/GameApp dist/
+          cp config.json dist/
+
       - name: Upload game
         uses: actions/upload-artifact@v4
         with:
           name: game-linux-${{ matrix.configuration }}
-          path: |
-            build/${{ matrix.configuration }}/bin/GameApp
-            config.json
+          path: dist/
