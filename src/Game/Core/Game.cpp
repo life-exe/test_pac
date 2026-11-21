@@ -1,7 +1,16 @@
 #include "Game.h"
 
+#include <utility>
+
+#include "Level.h"
+
 namespace LifeExe::Core
 {
+
+// The built-in level is a compile-time constant, so a parse failure is a programming error
+Game::Game() : Game(Maze::fromAscii(c_classicLevel).value()) {}
+
+Game::Game(Maze maze) : m_maze{std::move(maze)} {}
 
 void Game::update(float dt)
 {

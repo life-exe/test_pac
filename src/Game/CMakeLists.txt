@@ -7,6 +7,9 @@ add_library(GameCore STATIC
     Core/GameSnapshot.h
     Core/Game.h
     Core/Game.cpp
+    Core/Level.h
+    Core/Maze.h
+    Core/Maze.cpp
 )
 target_include_directories(GameCore PUBLIC Core)
 
@@ -32,8 +35,12 @@ target_link_libraries(GameApp PRIVATE GamePresentation GameCore Common)
 add_executable(GameTests
     Tests/GameTest.cpp
     Tests/TypesTest.cpp
+    Tests/TestHelpers.h
+    Tests/MazeTest.cpp
     Tests/Acceptance/KickoffAcceptanceTest.cpp
+    Tests/Acceptance/MazeAcceptanceTest.cpp
 )
+target_include_directories(GameTests PRIVATE Tests)
 target_link_libraries(GameTests PRIVATE GameCore GTest::gtest_main)
 
 # --- Properties, IDE folders and debugger ---
