@@ -8,21 +8,36 @@ Findings are errors (see .clang-tidy: WarningsAsErrors), so the run fails.
 
 Usage:
     python automation/run_tidy.py
+    python automation/run_tidy.py --target GameCore
 """
 
+import argparse
+import os
+
 from common import IS_WINDOWS, PROJECT_ROOT, build_dir, cmake_build, ensure_generated, relative, run
+
+parser = argparse.ArgumentParser(description="Run clang-tidy over the project.")
+parser.add_argument("--target", help="Optional CMake target to analyze (Windows only)")
+args = parser.parse_args()
 
 ensure_generated("Debug")
 
 if IS_WINDOWS:
-    run([
-        "cmake", "--build", relative(build_dir("Debug")), "--config", "Debug",
+    jobs = str(os.cpu_count() or 4)
+    command = [
+        "cmake", "--build", relative(build_dir("Debug")), "--config", "Debug", "--parallel",
+    ]
+    if args.target:
+        command += ["--target", args.target]
+    command += [
         "--",
         "/p:RunCodeAnalysis=true",
         "/p:EnableClangTidyCodeAnalysis=true",
         "/p:EnableMicrosoftCodeAnalysis=false",
-    ])
+        f"/p:MaxNumberOfProcesses={jobs}",
+    ]
+    run(command)
 else:
     cmake_build(build_dir("Debug"), "Debug")  # generated headers and the database must exist
     sources = sorted((PROJECT_ROOT / "src").rglob("*.cpp"))
-    run(["clang-tidy", "-p", relative(build_dir("Debug")), "--extra-arg=-Wno-ignored-gch", *(relative(s) for s in sources)]) 
+    run(["clang-tidy", "-p", relative(build_dir("Debug")), "--extra-arg=-Wno-ignored-gch", *(relative(s) for s in sources)])
