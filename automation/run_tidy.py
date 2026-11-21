@@ -36,6 +36,12 @@ if IS_WINDOWS:
         "/p:EnableMicrosoftCodeAnalysis=false",
         f"/p:MaxNumberOfProcesses={jobs}",
     ]
+    # MSVC 19.52+ gets /std:c++23 from CMake, which older bundled clang-tidy drops
+    # and then parses the code as pre-C++20, so the standard is passed explicitly.
+    # The now-unused MSVC /std flag must be silenced, or WarningsAsErrors fails the run.
+    # MSBuild reads properties from the environment; that is the only way to pass a
+    # ';'-separated list, because /p: on the command line treats ';' as a separator.
+    os.environ["ClangTidyExtraArgs"] = "/clang:-std=c++23;-Wno-unused-command-line-argument"
     run(command)
 else:
     cmake_build(build_dir("Debug"), "Debug")  # generated headers and the database must exist
