@@ -143,11 +143,13 @@ std::expected<Maze, MazeError> Maze::fromAscii(std::string_view asciiMap)
     }
     for (std::size_t index{0}; index < state.ghosts.size(); ++index)
     {
-        if (!state.ghosts[index])
+        // Bind once: the optional-access analysis cannot prove two operator[] calls hit the same element
+        const std::optional<GridPos>& ghost{state.ghosts[index]};
+        if (!ghost)
         {
             return std::unexpected{MazeError::MissingGhostSpawn};
         }
-        maze.m_ghostSpawns[index] = *state.ghosts[index];
+        maze.m_ghostSpawns[index] = *ghost;
     }
     if (!state.firstDoor)
     {
