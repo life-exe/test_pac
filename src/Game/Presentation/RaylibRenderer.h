@@ -3,6 +3,8 @@
 #include "GameSnapshot.h"
 #include "Command.h"
 
+#include <raylib.h>
+
 #include <string>
 #include <vector>
 
@@ -27,6 +29,7 @@ public:
 
 private:
     bool m_initialized{false};
+    Texture2D m_spritesheet{};
 };
 
 }  // namespace LifeExe::Presentation

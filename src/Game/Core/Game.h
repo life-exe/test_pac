@@ -38,7 +38,8 @@ public:
             .player = {.position = m_player.position(),
                 .direction = m_player.direction(),
                 .facing = m_player.facing(),
-                .isMoving = m_player.isMoving()}};
+                .isMoving = m_player.isMoving(),
+                .animTime = m_player.animTime()}};
     }
 
 private:

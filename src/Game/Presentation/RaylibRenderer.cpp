@@ -2,6 +2,8 @@
 
 #include <raylib.h>
 
+#include "SpriteAtlas.h"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -102,13 +104,37 @@ void drawMaze(const Core::GameSnapshot& snapshot, const MazeLayout& layout)
     }
 }
 
-// Temporary placeholder: a yellow circle until the animated sprite arrives in the next task
-void drawPlayer(const Core::PlayerSnapshot& player, const MazeLayout& layout)
+// The atlas frames face right, so every other direction is a rotation of the same frames
+float facingAngle(Core::Direction facing)
 {
-    const auto tileSize{static_cast<float>(layout.tileSize)};
-    const Vector2 centre{static_cast<float>(layout.originX) + (player.position.x * tileSize),
-        static_cast<float>(layout.originY) + (player.position.y * tileSize)};
-    DrawCircleV(centre, tileSize * 0.4f, YELLOW);
+    switch (facing)
+    {
+        case Core::Direction::Right: return 0.0f;
+        case Core::Direction::Down: return 90.0f;
+        case Core::Direction::Left: return 180.0f;
+        case Core::Direction::Up: return 270.0f;
+        case Core::Direction::None: return 0.0f;
+    }
+    return 0.0f;
+}
+
+Rectangle toRectangle(SpriteRect rect)
+{
+    return {static_cast<float>(rect.x), static_cast<float>(rect.y), static_cast<float>(rect.width), static_cast<float>(rect.height)};
+}
+
+void drawPlayer(const Core::PlayerSnapshot& player, const MazeLayout& layout, const Texture2D& spritesheet)
+{
+    // animTime freezes while the player stands, so the mouth stops on the current frame
+    constexpr float chomperFps{12.0f};
+    const int frame{static_cast<int>(player.animTime * chomperFps)};
+
+    const auto size{static_cast<float>(layout.tileSize)};
+    const Rectangle dest{static_cast<float>(layout.originX) + (player.position.x * size),
+        static_cast<float>(layout.originY) + (player.position.y * size), size, size};
+    // Rotating around the tile centre keeps the sprite on the player's position for every facing
+    const Vector2 origin{size * 0.5f, size * 0.5f};
+    DrawTexturePro(spritesheet, toRectangle(playerMoveFrame(frame)), dest, origin, facingAngle(player.facing), WHITE);
 }
 
 void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
@@ -167,6 +193,10 @@ void RaylibRenderer::init(int width, int height, const std::string& title)
     {
         SetConfigFlags(FLAG_MSAA_4X_HINT);
         InitWindow(width, height, title.c_str());
+        // Textures need the GL context created by InitWindow; the path is relative to the working directory
+        m_spritesheet = LoadTexture("assets/spritesheet.png");
+        // Point filtering keeps pixel art crisp when a 16px tile is scaled up
+        SetTextureFilter(m_spritesheet, TEXTURE_FILTER_POINT);
         SetTargetFPS(60);
         // Esc is handled as a regular key and reaches the core as Command::Quit
         SetExitKey(KEY_NULL);
@@ -178,6 +208,12 @@ void RaylibRenderer::close()
 {
     if (m_initialized)
     {
+        // The texture lives in the GL context, so it must be freed before the window closes
+        if (m_spritesheet.id != 0)
+        {
+            UnloadTexture(m_spritesheet);
+        }
+        m_spritesheet = {};
         CloseWindow();
         m_initialized = false;
     }
@@ -205,7 +241,7 @@ void RaylibRenderer::render(const Core::GameSnapshot& snapshot) const
     {
         const MazeLayout layout{computeLayout(snapshot, screen)};
         drawMaze(snapshot, layout);
-        drawPlayer(snapshot.player, layout);
+        drawPlayer(snapshot.player, layout, m_spritesheet);
     }
     drawHud(snapshot, screen);
     drawStateOverlay(snapshot.state, screen);

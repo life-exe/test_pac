@@ -33,6 +33,45 @@ TEST(PlayerTest, SnapshotStartsAtSpawn)
     EXPECT_EQ(player.direction, Core::Direction::None);
     EXPECT_EQ(player.facing, Core::Direction::Left);
     EXPECT_FALSE(player.isMoving);
+    EXPECT_FLOAT_EQ(player.animTime, 0.0f);
+}
+
+TEST(PlayerTest, AnimTimeGrowsWhileMoving)
+{
+    Core::Game game{Tests::makePlayingGame()};
+    game.handleCommand(Core::Command::MoveLeft);
+
+    game.update(c_oneTileDt);
+    EXPECT_FLOAT_EQ(game.snapshot().player.animTime, c_oneTileDt);
+
+    game.update(c_halfTileDt);
+    EXPECT_FLOAT_EQ(game.snapshot().player.animTime, c_oneTileDt + c_halfTileDt);
+}
+
+TEST(PlayerTest, AnimTimeFreezesWhenStoppedAtWall)
+{
+    Core::Game game{Tests::makePlayingGame()};
+    game.handleCommand(Core::Command::MoveDown);
+
+    // The wall is two cells below the spawn, so four tiles of travel end in a stop
+    game.update(4.0f * c_oneTileDt);
+    ASSERT_FALSE(game.snapshot().player.isMoving);
+    const float stoppedAnimTime{game.snapshot().player.animTime};
+
+    game.update(c_oneTileDt);
+    game.update(c_oneTileDt);
+    EXPECT_FLOAT_EQ(game.snapshot().player.animTime, stoppedAnimTime);
+}
+
+TEST(PlayerTest, AnimTimeFreezesWhilePaused)
+{
+    Core::Game game{Tests::makePlayingGame()};
+    game.handleCommand(Core::Command::MoveLeft);
+    game.update(c_oneTileDt);
+
+    game.handleCommand(Core::Command::Pause);
+    game.update(4.0f * c_oneTileDt);
+    EXPECT_FLOAT_EQ(game.snapshot().player.animTime, c_oneTileDt);
 }
 
 TEST(PlayerTest, MovesAlongStraightCorridor)
@@ -182,4 +221,5 @@ TEST(PlayerTest, ResetReturnsPlayerToSpawn)
     EXPECT_EQ(player.direction, Core::Direction::None);
     EXPECT_EQ(player.facing, Core::Direction::Left);
     EXPECT_FALSE(player.isMoving);
+    EXPECT_FLOAT_EQ(player.animTime, 0.0f);
 }
