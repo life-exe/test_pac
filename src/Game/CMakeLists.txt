@@ -24,9 +24,11 @@ add_library(GamePresentation STATIC
     Presentation/ConsoleRenderer.cpp
     Presentation/RaylibRenderer.h
     Presentation/RaylibRenderer.cpp
+    Presentation/SpriteAtlas.h
 )
 target_include_directories(GamePresentation PUBLIC Presentation)
-target_link_libraries(GamePresentation PUBLIC GameCore PRIVATE raylib) 
+# raylib is PUBLIC: RaylibRenderer.h holds a Texture2D, so its users need raylib headers too
+target_link_libraries(GamePresentation PUBLIC GameCore raylib)
 target_precompile_headers(GamePresentation PRIVATE <raylib.h>)
 
 # --- 3. GameApp (executable entry point) ---
@@ -43,11 +45,14 @@ add_executable(GameTests
     Tests/TestHelpers.h
     Tests/MazeTest.cpp
     Tests/PlayerTest.cpp
+    Tests/SpriteAtlasTest.cpp
     Tests/Acceptance/KickoffAcceptanceTest.cpp
     Tests/Acceptance/MazeAcceptanceTest.cpp
     Tests/Acceptance/PlayerMovementAcceptanceTest.cpp
+    Tests/Acceptance/SpritesheetAcceptanceTest.cpp
 )
-target_include_directories(GameTests PRIVATE Tests)
+# Presentation is only an include path: SpriteAtlas.h is header-only and raylib-free, so tests stay off raylib
+target_include_directories(GameTests PRIVATE Tests Presentation)
 target_link_libraries(GameTests PRIVATE GameCore GTest::gtest_main)
 
 # --- Properties, IDE folders and debugger ---
