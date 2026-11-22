@@ -1,0 +1,112 @@
+#include "GridMover.h"
+
+namespace LifeExe::Core
+{
+
+namespace
+{
+
+bool isInside(const Maze& maze, GridPos pos)
+{
+    return pos.row >= 0 && pos.row < maze.rows() && pos.col >= 0 && pos.col < maze.cols();
+}
+
+}  // namespace
+
+bool canEnter(const Maze& maze, Mover mover, GridPos from, Direction direction)
+{
+    if (direction == Direction::None)
+    {
+        return false;
+    }
+    const GridPos target{from + directionDelta(direction)};
+    if (maze.isWalkable(target, mover))
+    {
+        return true;
+    }
+    return maze.tileAt(from) == TileType::Tunnel && !isInside(maze, target) && target.row == from.row;
+}
+
+GridMover::GridMover(GridPos tile, Direction facing) : m_tile{tile}, m_facing{facing} {}
+
+void GridMover::update(const Maze& maze, const MoveStep& step, Direction& requested)
+{
+    float distance{step.speed * step.dt};
+    for (;;)
+    {
+        if (m_progress == 0.0f)
+        {
+            decideAtCentre(maze, step.mover, requested);
+            if (!m_isMoving)
+            {
+                return;
+            }
+        }
+        else
+        {
+            tryReverse(maze, requested);
+        }
+
+        const float toNextCell{1.0f - m_progress};
+        if (distance < toNextCell)
+        {
+            m_progress += distance;
+            return;
+        }
+        distance -= toNextCell;
+        arriveAtNextCell(maze);
+    }
+}
+
+Vec2f GridMover::position() const
+{
+    const GridPos delta{directionDelta(m_currentDirection)};
+    return {static_cast<float>(m_tile.col) + 0.5f + (static_cast<float>(delta.col) * m_progress),
+        static_cast<float>(m_tile.row) + 0.5f + (static_cast<float>(delta.row) * m_progress)};
+}
+
+void GridMover::arriveAtNextCell(const Maze& maze)
+{
+    const GridPos next{m_tile + directionDelta(m_currentDirection)};
+    m_tile = isInside(maze, next) ? next : maze.tunnelExit(m_tile);
+    m_progress = 0.0f;
+}
+
+void GridMover::decideAtCentre(const Maze& maze, Mover mover, Direction& requested)
+{
+    if (canEnter(maze, mover, m_tile, requested))
+    {
+        m_currentDirection = requested;
+        requested = Direction::None;
+    }
+    if (canEnter(maze, mover, m_tile, m_currentDirection))
+    {
+        m_facing = m_currentDirection;
+        m_isMoving = true;
+        return;
+    }
+    m_currentDirection = Direction::None;
+    m_isMoving = false;
+    m_progress = 0.0f;
+}
+
+void GridMover::tryReverse(const Maze& maze, Direction& requested)
+{
+    if (requested == Direction::None || requested != opposite(m_currentDirection))
+    {
+        return;
+    }
+    // Beyond the map edge the reversal waits for the tunnel jump: that cell cannot become m_tile
+    const GridPos next{m_tile + directionDelta(m_currentDirection)};
+    if (!isInside(maze, next))
+    {
+        return;
+    }
+    m_tile = next;
+    m_progress = 1.0f - m_progress;
+    m_currentDirection = requested;
+    m_facing = requested;
+    requested = Direction::None;
+}
+
+}  // namespace LifeExe::Core

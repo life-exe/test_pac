@@ -93,4 +93,8 @@ TEST(GameCoreTest, CommandToString)
     EXPECT_EQ(Core::toString(Core::Command::TogglePause), "TogglePause");
     EXPECT_EQ(Core::toString(Core::Command::Reset), "Reset");
     EXPECT_EQ(Core::toString(Core::Command::Quit), "Quit");
+    EXPECT_EQ(Core::toString(Core::Command::MoveUp), "MoveUp");
+    EXPECT_EQ(Core::toString(Core::Command::MoveDown), "MoveDown");
+    EXPECT_EQ(Core::toString(Core::Command::MoveLeft), "MoveLeft");
+    EXPECT_EQ(Core::toString(Core::Command::MoveRight), "MoveRight");
 }

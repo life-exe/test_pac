@@ -85,4 +85,39 @@ enum class GhostId : std::uint8_t
     Coral
 };
 
+enum class Direction : std::uint8_t
+{
+    None = 0,
+    Up,
+    Down,
+    Left,
+    Right
+};
+
+constexpr Direction opposite(Direction direction)
+{
+    switch (direction)
+    {
+        case Direction::Up: return Direction::Down;
+        case Direction::Down: return Direction::Up;
+        case Direction::Left: return Direction::Right;
+        case Direction::Right: return Direction::Left;
+        case Direction::None: return Direction::None;
+    }
+    return Direction::None;
+}
+
+constexpr GridPos directionDelta(Direction direction)
+{
+    switch (direction)
+    {
+        case Direction::Up: return {-1, 0};
+        case Direction::Down: return {1, 0};
+        case Direction::Left: return {0, -1};
+        case Direction::Right: return {0, 1};
+        case Direction::None: return {0, 0};
+    }
+    return {0, 0};
+}
+
 }  // namespace LifeExe::Core
