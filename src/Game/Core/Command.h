@@ -13,7 +13,11 @@ enum class Command : std::uint8_t
     Resume,
     TogglePause,
     Reset,
-    Quit
+    Quit,
+    MoveUp,
+    MoveDown,
+    MoveLeft,
+    MoveRight
 };
 
 constexpr std::string_view toString(Command command)
@@ -26,6 +30,10 @@ constexpr std::string_view toString(Command command)
         case Command::TogglePause: return "TogglePause";
         case Command::Reset: return "Reset";
         case Command::Quit: return "Quit";
+        case Command::MoveUp: return "MoveUp";
+        case Command::MoveDown: return "MoveDown";
+        case Command::MoveLeft: return "MoveLeft";
+        case Command::MoveRight: return "MoveRight";
     }
     return "Unknown";
 }

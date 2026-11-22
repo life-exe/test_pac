@@ -10,6 +10,11 @@ add_library(GameCore STATIC
     Core/Level.h
     Core/Maze.h
     Core/Maze.cpp
+    Core/GameConstants.h
+    Core/GridMover.h
+    Core/GridMover.cpp
+    Core/Player.h
+    Core/Player.cpp
 )
 target_include_directories(GameCore PUBLIC Core)
 
@@ -37,8 +42,10 @@ add_executable(GameTests
     Tests/TypesTest.cpp
     Tests/TestHelpers.h
     Tests/MazeTest.cpp
+    Tests/PlayerTest.cpp
     Tests/Acceptance/KickoffAcceptanceTest.cpp
     Tests/Acceptance/MazeAcceptanceTest.cpp
+    Tests/Acceptance/PlayerMovementAcceptanceTest.cpp
 )
 target_include_directories(GameTests PRIVATE Tests)
 target_link_libraries(GameTests PRIVATE GameCore GTest::gtest_main)

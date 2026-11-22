@@ -3,6 +3,7 @@
 #include <raylib.h>
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <format>
 #include <string>
@@ -19,6 +20,24 @@ constexpr int c_hudFontSize{20};
 
 constexpr Color c_wallColor{33, 33, 255, 255};
 constexpr Color c_ghostDoorColor{255, 184, 222, 255};
+
+struct KeyBinding
+{
+    KeyboardKey key{KEY_NULL};
+    Core::Command command{Core::Command::None};
+};
+
+// WASD and the arrows are equal alternatives, so both map to the same movement commands
+constexpr std::array c_moveBindings{
+    KeyBinding{.key = KEY_W, .command = Core::Command::MoveUp},
+    KeyBinding{.key = KEY_UP, .command = Core::Command::MoveUp},
+    KeyBinding{.key = KEY_S, .command = Core::Command::MoveDown},
+    KeyBinding{.key = KEY_DOWN, .command = Core::Command::MoveDown},
+    KeyBinding{.key = KEY_A, .command = Core::Command::MoveLeft},
+    KeyBinding{.key = KEY_LEFT, .command = Core::Command::MoveLeft},
+    KeyBinding{.key = KEY_D, .command = Core::Command::MoveRight},
+    KeyBinding{.key = KEY_RIGHT, .command = Core::Command::MoveRight},
+};
 
 // Width and height travel together, so they cannot be swapped at a call site
 struct ScreenSize
@@ -83,6 +102,15 @@ void drawMaze(const Core::GameSnapshot& snapshot, const MazeLayout& layout)
     }
 }
 
+// Temporary placeholder: a yellow circle until the animated sprite arrives in the next task
+void drawPlayer(const Core::PlayerSnapshot& player, const MazeLayout& layout)
+{
+    const auto tileSize{static_cast<float>(layout.tileSize)};
+    const Vector2 centre{static_cast<float>(layout.originX) + (player.position.x * tileSize),
+        static_cast<float>(layout.originY) + (player.position.y * tileSize)};
+    DrawCircleV(centre, tileSize * 0.4f, YELLOW);
+}
+
 void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
 {
     const int textY{(c_hudMargin - c_hudFontSize) / 2};
@@ -97,7 +125,7 @@ void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
 
     constexpr int tipFontSize{18};
     const int tipY{screen.height - c_hudMargin + ((c_hudMargin - tipFontSize) / 2)};
-    DrawText("Controls: [P] Pause/Resume | [R] Reset | [ESC] Quit", 10, tipY, tipFontSize, GRAY);
+    DrawText("Controls: [WASD/Arrows] Move | [P] Pause/Resume | [R] Reset | [ESC] Quit", 10, tipY, tipFontSize, GRAY);
 }
 
 void drawStateOverlay(Core::GameState state, ScreenSize screen)
@@ -175,7 +203,9 @@ void RaylibRenderer::render(const Core::GameSnapshot& snapshot) const
     // A default snapshot has no maze, and the layout would divide by zero
     if (snapshot.mazeRows > 0 && snapshot.mazeCols > 0)
     {
-        drawMaze(snapshot, computeLayout(snapshot, screen));
+        const MazeLayout layout{computeLayout(snapshot, screen)};
+        drawMaze(snapshot, layout);
+        drawPlayer(snapshot.player, layout);
     }
     drawHud(snapshot, screen);
     drawStateOverlay(snapshot.state, screen);
@@ -205,6 +235,14 @@ std::vector<Core::Command> RaylibRenderer::processInput() const
     if (IsKeyPressed(KEY_ESCAPE))
     {
         commands.push_back(Core::Command::Quit);
+    }
+
+    for (const KeyBinding& binding : c_moveBindings)
+    {
+        if (IsKeyPressed(binding.key))
+        {
+            commands.push_back(binding.command);
+        }
     }
 
     return commands;
