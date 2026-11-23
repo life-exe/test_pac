@@ -11,7 +11,8 @@ enum class GameState : std::uint8_t
 {
     Playing = 0,
     Paused,
-    GameOver
+    GameOver,
+    Victory
 };
 
 /// Returns the string name of a GameState value.
@@ -22,6 +23,7 @@ constexpr std::string_view toString(GameState state)
         case GameState::Playing: return "Playing";
         case GameState::Paused: return "Paused";
         case GameState::GameOver: return "GameOver";
+        case GameState::Victory: return "Victory";
     }
     return "Unknown";
 }

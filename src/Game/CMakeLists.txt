@@ -50,6 +50,7 @@ add_executable(GameTests
     Tests/Acceptance/MazeAcceptanceTest.cpp
     Tests/Acceptance/PlayerMovementAcceptanceTest.cpp
     Tests/Acceptance/SpritesheetAcceptanceTest.cpp
+    Tests/Acceptance/PelletsAndScoreAcceptanceTest.cpp
 )
 # Presentation is only an include path: SpriteAtlas.h is header-only and raylib-free, so tests stay off raylib
 target_include_directories(GameTests PRIVATE Tests Presentation)

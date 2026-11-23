@@ -25,6 +25,9 @@ struct GameSnapshot
     int mazeCols{0};
     std::span<const TileType> tiles;
     PlayerSnapshot player;
+    int score{0};
+    int highScore{0};
+    int remainingPellets{0};
 };
 
 }  // namespace LifeExe::Core

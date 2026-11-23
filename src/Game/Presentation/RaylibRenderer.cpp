@@ -6,8 +6,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <format>
+#include <numbers>
 #include <string>
 
 namespace LifeExe::Presentation
@@ -79,7 +81,32 @@ void drawGhostDoor(Rectangle tile)
     DrawRectangleRec(bar, c_ghostDoorColor);
 }
 
-void drawMaze(const Core::GameSnapshot& snapshot, const MazeLayout& layout)
+Rectangle toRectangle(SpriteRect rect)
+{
+    return {static_cast<float>(rect.x), static_cast<float>(rect.y), static_cast<float>(rect.width), static_cast<float>(rect.height)};
+}
+
+void drawPellet(Rectangle tile, const Texture2D& spritesheet)
+{
+    DrawTexturePro(spritesheet, toRectangle(pelletSprite()), tile, {0.0f, 0.0f}, 0.0f, WHITE);
+}
+
+// The power pellet breathes so it stands out from regular pellets; totalTime freezes on pause, and so does the pulse
+void drawPowerPellet(Rectangle tile, double totalTime, const Texture2D& spritesheet)
+{
+    constexpr float pulseHz{2.0f};
+    constexpr float minScale{0.8f};
+    const float phase{std::sin(static_cast<float>(totalTime) * 2.0f * std::numbers::pi_v<float> * pulseHz)};
+    const float scale{minScale + ((1.0f - minScale) * 0.5f * (phase + 1.0f))};
+
+    const float size{tile.width * scale};
+    // Scaling around the tile centre keeps the sprite in place while it pulses
+    const Rectangle dest{tile.x + (tile.width * 0.5f), tile.y + (tile.height * 0.5f), size, size};
+    const Vector2 origin{size * 0.5f, size * 0.5f};
+    DrawTexturePro(spritesheet, toRectangle(powerPelletSprite()), dest, origin, 0.0f, WHITE);
+}
+
+void drawMaze(const Core::GameSnapshot& snapshot, const MazeLayout& layout, const Texture2D& spritesheet)
 {
     const auto size{static_cast<float>(layout.tileSize)};
     for (int row{0}; row < snapshot.mazeRows; ++row)
@@ -94,10 +121,9 @@ void drawMaze(const Core::GameSnapshot& snapshot, const MazeLayout& layout)
             {
                 case Core::TileType::Wall: drawWall(tile); break;
                 case Core::TileType::GhostDoor: drawGhostDoor(tile); break;
-                // Pellets and the rest get their look in later tasks
+                case Core::TileType::Pellet: drawPellet(tile, spritesheet); break;
+                case Core::TileType::PowerPellet: drawPowerPellet(tile, snapshot.totalTime, spritesheet); break;
                 case Core::TileType::Empty:
-                case Core::TileType::Pellet:
-                case Core::TileType::PowerPellet:
                 case Core::TileType::Tunnel: break;
             }
         }
@@ -118,11 +144,6 @@ float facingAngle(Core::Direction facing)
     return 0.0f;
 }
 
-Rectangle toRectangle(SpriteRect rect)
-{
-    return {static_cast<float>(rect.x), static_cast<float>(rect.y), static_cast<float>(rect.width), static_cast<float>(rect.height)};
-}
-
 void drawPlayer(const Core::PlayerSnapshot& player, const MazeLayout& layout, const Texture2D& spritesheet)
 {
     // animTime freezes while the player stands, so the mouth stops on the current frame
@@ -137,21 +158,68 @@ void drawPlayer(const Core::PlayerSnapshot& player, const MazeLayout& layout, co
     DrawTexturePro(spritesheet, toRectangle(playerMoveFrame(frame)), dest, origin, facingAngle(player.facing), WHITE);
 }
 
-void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
+void drawTextRightAligned(const std::string& text, int rightX, int y, int fontSize, Color color)
 {
-    const int textY{(c_hudMargin - c_hudFontSize) / 2};
-    DrawFPS(10, textY);
+    DrawText(text.c_str(), rightX - MeasureText(text.c_str(), fontSize), y, fontSize, color);
+}
 
-    const std::string timeText{std::format("Time: {:.2f}s", snapshot.totalTime)};
-    DrawText(timeText.c_str(), 120, textY, c_hudFontSize, LIGHTGRAY);
+// Top band: what the player plays for - score, record and game state
+void drawTopHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
+{
+    constexpr int sidePadding{10};
+    const int textY{(c_hudMargin - c_hudFontSize) / 2};
+
+    const std::string scoreText{std::format("SCORE: {}", snapshot.score)};
+    DrawText(scoreText.c_str(), sidePadding, textY, c_hudFontSize, WHITE);
+
+    const std::string highScoreText{std::format("HIGH SCORE: {}", snapshot.highScore)};
+    const int highScoreWidth{MeasureText(highScoreText.c_str(), c_hudFontSize)};
+    DrawText(highScoreText.c_str(), (screen.width - highScoreWidth) / 2, textY, c_hudFontSize, GOLD);
 
     const std::string stateText{std::format("STATE: {}", Core::toString(snapshot.state))};
-    const int stateWidth{MeasureText(stateText.c_str(), c_hudFontSize)};
-    DrawText(stateText.c_str(), screen.width - stateWidth - 10, textY, c_hudFontSize, LIGHTGRAY);
+    drawTextRightAligned(stateText, screen.width - sidePadding, textY, c_hudFontSize, LIGHTGRAY);
+}
 
-    constexpr int tipFontSize{18};
-    const int tipY{screen.height - c_hudMargin + ((c_hudMargin - tipFontSize) / 2)};
-    DrawText("Controls: [WASD/Arrows] Move | [P] Pause/Resume | [R] Reset | [ESC] Quit", 10, tipY, tipFontSize, GRAY);
+// Bottom band: progress and diagnostics on the first line, controls on the second
+void drawBottomHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
+{
+    constexpr int sidePadding{10};
+    constexpr int fontSize{16};
+    constexpr int lineGap{6};
+    const int bandTop{screen.height - c_hudMargin};
+    const int firstLineY{bandTop + ((c_hudMargin - (2 * fontSize) - lineGap) / 2)};
+    const int secondLineY{firstLineY + fontSize + lineGap};
+
+    const std::string pelletsText{std::format("PELLETS: {}", snapshot.remainingPellets)};
+    DrawText(pelletsText.c_str(), sidePadding, firstLineY, fontSize, WHITE);
+
+    const std::string diagnosticsText{std::format("FPS: {}  Time: {:.2f}s", GetFPS(), snapshot.totalTime)};
+    drawTextRightAligned(diagnosticsText, screen.width - sidePadding, firstLineY, fontSize, LIGHTGRAY);
+
+    DrawText("Controls: [WASD/Arrows] Move | [P] Pause/Resume | [R] Reset | [ESC] Quit", sidePadding, secondLineY, fontSize, GRAY);
+}
+
+void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
+{
+    drawTopHud(snapshot, screen);
+    drawBottomHud(snapshot, screen);
+}
+
+// Victory covers the whole screen: the round is over, and the dimmed maze shows what was cleared
+void drawVictoryOverlay(ScreenSize screen)
+{
+    DrawRectangle(0, 0, screen.width, screen.height, Fade(BLACK, 0.6f));
+
+    constexpr const char* title{"VICTORY!"};
+    constexpr int titleFontSize{48};
+    const int titleWidth{MeasureText(title, titleFontSize)};
+    const int titleY{(screen.height / 2) - titleFontSize};
+    DrawText(title, (screen.width - titleWidth) / 2, titleY, titleFontSize, GOLD);
+
+    constexpr const char* hint{"PRESS [R] TO RESTART"};
+    constexpr int hintFontSize{24};
+    const int hintWidth{MeasureText(hint, hintFontSize)};
+    DrawText(hint, (screen.width - hintWidth) / 2, titleY + titleFontSize + 16, hintFontSize, RAYWHITE);
 }
 
 void drawStateOverlay(Core::GameState state, ScreenSize screen)
@@ -169,6 +237,7 @@ void drawStateOverlay(Core::GameState state, ScreenSize screen)
             text = "GAME OVER";
             color = RED;
             break;
+        case Core::GameState::Victory: drawVictoryOverlay(screen); return;
     }
 
     constexpr int fontSize{30};
@@ -240,7 +309,7 @@ void RaylibRenderer::render(const Core::GameSnapshot& snapshot) const
     if (snapshot.mazeRows > 0 && snapshot.mazeCols > 0)
     {
         const MazeLayout layout{computeLayout(snapshot, screen)};
-        drawMaze(snapshot, layout);
+        drawMaze(snapshot, layout, m_spritesheet);
         drawPlayer(snapshot.player, layout, m_spritesheet);
     }
     drawHud(snapshot, screen);
