@@ -6,36 +6,32 @@
 namespace LifeExe::Core
 {
 
-// Can a mover standing in the centre of 'from' step into the next cell in 'direction'?
-// The only exception to "a cell outside the map is a wall" is the tunnel mouth at the map edge.
+// The only exception to "out-of-bounds is a wall" is a tunnel exit at the map edge.
 bool canEnter(const Maze& maze, Mover mover, GridPos from, Direction direction);
 
-// Parameters of a single movement step along the maze
 struct MoveStep
 {
     Mover mover{Mover::Player};
-    float speed{0.0f};
-    float dt{0.0f};
+    float speed{0.0f};  // tiles per second
+    float dt{0.0f};     // seconds
 };
 
-// Movement model "tile + progress", shared by the player and the ghosts
 class GridMover
 {
 public:
     GridMover(GridPos tile, Direction facing);
 
-    // Moves along the maze by step.speed * step.dt tiles. 'requested' is the wanted direction: it is
-    // consumed at a cell centre when the turn is possible, and an opposite request reverses at once.
+    // requested is cleared to Direction::None once consumed.
     void update(const Maze& maze, const MoveStep& step, Direction& requested);
 
+    // Advances at most to the next cell centre; returns true if a new cell centre was reached.
+    bool stepCell(const Maze& maze, Mover mover, float& distance, Direction& requested);
+
     GridPos tile() const { return m_tile; }
-
     Direction direction() const { return m_currentDirection; }
-
-    Direction facing() const { return m_facing; }
-
+    Direction facing() const { return m_facing; }  // preserved when stopped before a wall
     bool isMoving() const { return m_isMoving; }
-
+    float progress() const { return m_progress; }
     Vec2f position() const;
 
 private:

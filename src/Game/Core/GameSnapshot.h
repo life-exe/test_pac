@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <span>
 
 #include "Types.h"
@@ -16,6 +17,13 @@ struct PlayerSnapshot
     float animTime{0.0f};
 };
 
+struct GhostSnapshot
+{
+    GhostId id{GhostId::Ruby};
+    Vec2f position;
+    Direction direction{Direction::None};
+};
+
 // Read-only frame snapshot; tiles views core memory until the next update, handleCommand or reset.
 struct GameSnapshot
 {
@@ -25,6 +33,7 @@ struct GameSnapshot
     int mazeCols{0};
     std::span<const TileType> tiles;
     PlayerSnapshot player;
+    std::array<GhostSnapshot, 4> ghosts;
     int score{0};
     int highScore{0};
     int remainingPellets{0};

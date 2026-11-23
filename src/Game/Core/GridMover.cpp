@@ -32,30 +32,37 @@ GridMover::GridMover(GridPos tile, Direction facing) : m_tile{tile}, m_facing{fa
 void GridMover::update(const Maze& maze, const MoveStep& step, Direction& requested)
 {
     float distance{step.speed * step.dt};
-    for (;;)
+    while (stepCell(maze, step.mover, distance, requested))
     {
-        if (m_progress == 0.0f)
-        {
-            decideAtCentre(maze, step.mover, requested);
-            if (!m_isMoving)
-            {
-                return;
-            }
-        }
-        else
-        {
-            tryReverse(maze, requested);
-        }
-
-        const float toNextCell{1.0f - m_progress};
-        if (distance < toNextCell)
-        {
-            m_progress += distance;
-            return;
-        }
-        distance -= toNextCell;
-        arriveAtNextCell(maze);
     }
+}
+
+bool GridMover::stepCell(const Maze& maze, Mover mover, float& distance, Direction& requested)
+{
+    if (m_progress == 0.0f)
+    {
+        decideAtCentre(maze, mover, requested);
+        if (!m_isMoving)
+        {
+            distance = 0.0f;
+            return false;
+        }
+    }
+    else
+    {
+        tryReverse(maze, requested);
+    }
+
+    const float toNextCell{1.0f - m_progress};
+    if (distance < toNextCell)
+    {
+        m_progress += distance;
+        distance = 0.0f;
+        return false;
+    }
+    distance -= toNextCell;
+    arriveAtNextCell(maze);
+    return true;
 }
 
 Vec2f GridMover::position() const
