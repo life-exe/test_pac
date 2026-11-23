@@ -312,6 +312,95 @@ TEST(MazeErrorTest, UnpairedTunnel)
         Core::MazeError::UnpairedTunnel);
 }
 
+// --- Pellets ---
+
+TEST(MazeTest, SmallLevelCountsPellets)
+{
+    const Core::Maze maze{parseOrFail(Tests::c_smallLevel)};
+    // 38 regular pellets and 2 power pellets
+    EXPECT_EQ(maze.remainingPellets(), 40);
+}
+
+TEST(MazeTest, ClassicLevelCountsPellets)
+{
+    const Core::Maze maze{parseOrFail(Core::c_classicLevel)};
+    // Counting tiles directly gives an oracle that does not depend on the parser's counter
+    const auto pellets{std::ranges::count_if(
+        maze.tiles(), [](Core::TileType tile) { return tile == Core::TileType::Pellet || tile == Core::TileType::PowerPellet; })};
+    EXPECT_GT(maze.remainingPellets(), 0);
+    EXPECT_EQ(maze.remainingPellets(), static_cast<int>(pellets));
+}
+
+TEST(MazeTest, ConsumePelletReturnsPelletAndClearsTile)
+{
+    Core::Maze maze{parseOrFail(Tests::c_smallLevel)};
+    constexpr Core::GridPos pellet{1, 1};
+    ASSERT_EQ(maze.tileAt(pellet), Core::TileType::Pellet);
+
+    EXPECT_EQ(maze.consumeTileAt(pellet), Core::TileType::Pellet);
+    EXPECT_EQ(maze.tileAt(pellet), Core::TileType::Empty);
+    EXPECT_EQ(maze.remainingPellets(), 39);
+}
+
+TEST(MazeTest, ConsumePowerPelletReturnsPowerPellet)
+{
+    Core::Maze maze{parseOrFail(Tests::c_smallLevel)};
+    constexpr Core::GridPos powerPellet{6, 1};
+    ASSERT_EQ(maze.tileAt(powerPellet), Core::TileType::PowerPellet);
+
+    EXPECT_EQ(maze.consumeTileAt(powerPellet), Core::TileType::PowerPellet);
+    EXPECT_EQ(maze.tileAt(powerPellet), Core::TileType::Empty);
+    EXPECT_EQ(maze.remainingPellets(), 39);
+}
+
+TEST(MazeTest, ConsumeClearedTileIsNoOp)
+{
+    Core::Maze maze{parseOrFail(Tests::c_smallLevel)};
+    constexpr Core::GridPos pellet{1, 1};
+    ASSERT_EQ(maze.consumeTileAt(pellet), Core::TileType::Pellet);
+
+    EXPECT_EQ(maze.consumeTileAt(pellet), Core::TileType::Empty);
+    EXPECT_EQ(maze.tileAt(pellet), Core::TileType::Empty);
+    EXPECT_EQ(maze.remainingPellets(), 39);
+}
+
+TEST(MazeTest, ConsumeWallAndEmptyTileIsNoOp)
+{
+    Core::Maze maze{parseOrFail(Tests::c_smallLevel)};
+    constexpr std::array untouched{
+        std::pair{Core::GridPos{0, 0}, Core::TileType::Wall},
+        std::pair{Core::GridPos{3, 3}, Core::TileType::Empty},
+        std::pair{Core::GridPos{5, 0}, Core::TileType::Tunnel},
+        std::pair{Core::GridPos{2, 5}, Core::TileType::GhostDoor},
+    };
+
+    for (const auto& [pos, type] : untouched)
+    {
+        ASSERT_EQ(maze.tileAt(pos), type);
+        EXPECT_EQ(maze.consumeTileAt(pos), Core::TileType::Empty) << "row " << pos.row << ", col " << pos.col;
+        // The tile keeps its type: only pellets are replaced
+        EXPECT_EQ(maze.tileAt(pos), type) << "row " << pos.row << ", col " << pos.col;
+    }
+    EXPECT_EQ(maze.remainingPellets(), 40);
+}
+
+TEST(MazeTest, ConsumeOutOfBoundsIsNoOp)
+{
+    Core::Maze maze{parseOrFail(Tests::c_smallLevel)};
+    const std::array outside{
+        Core::GridPos{-1, 0},
+        Core::GridPos{0, -1},
+        Core::GridPos{maze.rows(), 0},
+        Core::GridPos{0, maze.cols()},
+    };
+
+    for (const Core::GridPos pos : outside)
+    {
+        EXPECT_EQ(maze.consumeTileAt(pos), Core::TileType::Empty) << "row " << pos.row << ", col " << pos.col;
+    }
+    EXPECT_EQ(maze.remainingPellets(), 40);
+}
+
 // --- Game owns the maze ---
 
 TEST(GameMazeTest, DefaultGameUsesClassicLevel)

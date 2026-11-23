@@ -134,6 +134,11 @@ std::expected<Maze, MazeError> Maze::fromAscii(std::string_view asciiMap)
                 return std::unexpected{tile.error()};
             }
             maze.m_tiles[tileIndex(row, col, maze.m_cols)] = *tile;
+
+            if (*tile == TileType::Pellet || *tile == TileType::PowerPellet)
+            {
+                ++maze.m_remainingPellets;
+            }
         }
     }
 
@@ -212,6 +217,23 @@ GridPos Maze::scatterCorner(GhostId id) const
         case GhostId::Coral: return {m_rows + 1, 0};
     }
     return {};
+}
+
+TileType Maze::consumeTileAt(GridPos pos)
+{
+    if (pos.row < 0 || pos.row >= m_rows || pos.col < 0 || pos.col >= m_cols)
+    {
+        return TileType::Empty;
+    }
+    TileType& tile{m_tiles[tileIndex(pos.row, pos.col, m_cols)]};
+    if (tile != TileType::Pellet && tile != TileType::PowerPellet)
+    {
+        return TileType::Empty;
+    }
+    const TileType consumed{tile};
+    tile = TileType::Empty;
+    --m_remainingPellets;
+    return consumed;
 }
 
 }  // namespace LifeExe::Core

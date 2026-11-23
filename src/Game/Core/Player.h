@@ -19,6 +19,7 @@ public:
     Direction facing() const { return m_mover.facing(); }  // preserved when stopped before a wall
     bool isMoving() const { return m_mover.isMoving(); }
     float animTime() const { return m_animTime; }  // seconds, freezes when stopped
+    GridPos tile() const { return m_mover.tile(); }
 
 private:
     GridMover m_mover;
