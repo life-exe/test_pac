@@ -158,6 +158,34 @@ void drawPlayer(const Core::PlayerSnapshot& player, const MazeLayout& layout, co
     DrawTexturePro(spritesheet, toRectangle(playerMoveFrame(frame)), dest, origin, facingAngle(player.facing), WHITE);
 }
 
+Color ghostTint(Core::GhostId id)
+{
+    switch (id)
+    {
+        case Core::GhostId::Ruby: return RED;
+        case Core::GhostId::Rosie: return PINK;
+        case Core::GhostId::Indigo: return SKYBLUE;
+        case Core::GhostId::Coral: return ORANGE;
+    }
+    return WHITE;
+}
+
+// One body sprite serves every ghost through the tint; the eyes are a separate layer so they keep their own colours
+void drawGhost(const Core::GhostSnapshot& ghost, const MazeLayout& layout, double totalTime, const Texture2D& spritesheet)
+{
+    // totalTime freezes on pause, and so does the skirt
+    constexpr double skirtPhasesPerSecond{6.0};
+    const int phase{static_cast<int>(totalTime * skirtPhasesPerSecond)};
+
+    const auto size{static_cast<float>(layout.tileSize)};
+    const Rectangle dest{static_cast<float>(layout.originX) + (ghost.position.x * size),
+        static_cast<float>(layout.originY) + (ghost.position.y * size), size, size};
+    // position is the tile centre, so the sprite is anchored by its centre
+    const Vector2 origin{size * 0.5f, size * 0.5f};
+    DrawTexturePro(spritesheet, toRectangle(ghostBodyFrame(phase)), dest, origin, 0.0f, ghostTint(ghost.id));
+    DrawTexturePro(spritesheet, toRectangle(ghostEyesFrame(ghost.direction)), dest, origin, 0.0f, WHITE);
+}
+
 void drawTextRightAligned(const std::string& text, int rightX, int y, int fontSize, Color color)
 {
     DrawText(text.c_str(), rightX - MeasureText(text.c_str(), fontSize), y, fontSize, color);
@@ -311,6 +339,10 @@ void RaylibRenderer::render(const Core::GameSnapshot& snapshot) const
         const MazeLayout layout{computeLayout(snapshot, screen)};
         drawMaze(snapshot, layout, m_spritesheet);
         drawPlayer(snapshot.player, layout, m_spritesheet);
+        for (const Core::GhostSnapshot& ghost : snapshot.ghosts)
+        {
+            drawGhost(ghost, layout, snapshot.totalTime, m_spritesheet);
+        }
     }
     drawHud(snapshot, screen);
     drawStateOverlay(snapshot.state, screen);

@@ -1,6 +1,8 @@
 #include "Game.h"
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <utility>
 
 #include "GameConstants.h"
@@ -24,13 +26,30 @@ Direction toDirection(Command command)
     }
 }
 
+GhostConfig makeGhostConfig(const Maze& maze, GhostId id, bool inHouse, float releaseDelay)
+{
+    return {
+        .id = id, .spawn = maze.ghostSpawn(id), .scatterCorner = maze.scatterCorner(id), .inHouse = inHouse, .releaseDelay = releaseDelay};
+}
+
+// Order matches GhostId, so m_ghosts can be indexed by it; Ruby starts outside and the rest leave the house in turn
+std::array<Ghost, 4> makeGhosts(const Maze& maze)
+{
+    return {Ghost{makeGhostConfig(maze, GhostId::Ruby, false, 0.0f)},
+        Ghost{makeGhostConfig(maze, GhostId::Rosie, true, c_rosieReleaseDelay)},
+        Ghost{makeGhostConfig(maze, GhostId::Indigo, true, c_indigoReleaseDelay)},
+        Ghost{makeGhostConfig(maze, GhostId::Coral, true, c_coralReleaseDelay)}};
+}
+
 }  // namespace
 
 // The built-in map must be valid, so a parse error here is a programming error
 // and value() may throw
 Game::Game() : Game{Maze::fromAscii(c_classicLevel).value()} {}
 
-Game::Game(Maze maze) : m_initialMaze{std::move(maze)}, m_maze{m_initialMaze}, m_player{m_maze.playerSpawn()} {}
+Game::Game(Maze maze) : m_initialMaze{std::move(maze)}, m_maze{m_initialMaze}, m_player{m_maze.playerSpawn()}, m_ghosts{makeGhosts(m_maze)}
+{
+}
 
 void Game::update(float dt)
 {
@@ -108,6 +127,7 @@ void Game::reset()
     m_score = 0;
     m_maze = m_initialMaze;
     m_player = Player{m_maze.playerSpawn()};
+    m_ghosts = makeGhosts(m_maze);
 }
 
 void Game::setHighScore(int highScore)
@@ -127,6 +147,7 @@ GameSnapshot Game::snapshot() const
             .facing = m_player.facing(),
             .isMoving = m_player.isMoving(),
             .animTime = m_player.animTime()},
+        .ghosts = ghostSnapshots(),
         .score = m_score,
         .highScore = m_highScore,
         .remainingPellets = m_maze.remainingPellets()};
@@ -135,7 +156,22 @@ GameSnapshot Game::snapshot() const
 void Game::updateSubstep(float stepDt)
 {
     m_player.update(m_maze, stepDt);
+    for (Ghost& ghost : m_ghosts)
+    {
+        ghost.update(m_maze, stepDt);
+    }
     consumePelletAtPlayer();
+}
+
+std::array<GhostSnapshot, 4> Game::ghostSnapshots() const
+{
+    std::array<GhostSnapshot, 4> snapshots{};
+    for (std::size_t index{0}; index < m_ghosts.size(); ++index)
+    {
+        const Ghost& ghost{m_ghosts[index]};
+        snapshots[index] = {.id = ghost.id(), .position = ghost.position(), .direction = ghost.direction()};
+    }
+    return snapshots;
 }
 
 void Game::consumePelletAtPlayer()

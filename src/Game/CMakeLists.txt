@@ -15,6 +15,8 @@ add_library(GameCore STATIC
     Core/GridMover.cpp
     Core/Player.h
     Core/Player.cpp
+    Core/Ghost.h
+    Core/Ghost.cpp
 )
 target_include_directories(GameCore PUBLIC Core)
 
@@ -45,12 +47,14 @@ add_executable(GameTests
     Tests/TestHelpers.h
     Tests/MazeTest.cpp
     Tests/PlayerTest.cpp
+    Tests/GhostTest.cpp
     Tests/SpriteAtlasTest.cpp
     Tests/Acceptance/KickoffAcceptanceTest.cpp
     Tests/Acceptance/MazeAcceptanceTest.cpp
     Tests/Acceptance/PlayerMovementAcceptanceTest.cpp
     Tests/Acceptance/SpritesheetAcceptanceTest.cpp
     Tests/Acceptance/PelletsAndScoreAcceptanceTest.cpp
+    Tests/Acceptance/GhostNavigationAcceptanceTest.cpp
 )
 # Presentation is only an include path: SpriteAtlas.h is header-only and raylib-free, so tests stay off raylib
 target_include_directories(GameTests PRIVATE Tests Presentation)
