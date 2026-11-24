@@ -33,6 +33,7 @@ public:
     bool isMoving() const { return m_isMoving; }
     float progress() const { return m_progress; }
     Vec2f position() const;
+    bool reverse(const Maze& maze, Mover mover);
 
 private:
     void decideAtCentre(const Maze& maze, Mover mover, Direction& requested);
@@ -41,6 +42,7 @@ private:
 
     GridPos m_tile;
     Direction m_currentDirection{Direction::None};
+    Direction m_entryDirection{Direction::None};
     Direction m_facing;
     bool m_isMoving{false};
     float m_progress{0.0f};

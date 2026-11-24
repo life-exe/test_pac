@@ -8,6 +8,7 @@
 #include "Maze.h"
 #include "Player.h"
 #include "Types.h"
+#include "GameConstants.h"
 
 namespace LifeExe::Core
 {
@@ -31,6 +32,7 @@ private:
     void updateSubstep(float stepDt);
     void consumePelletAtPlayer();
     std::array<GhostSnapshot, 4> ghostSnapshots() const;
+    void updateWaveTimer(float stepDt);
 
     Maze m_initialMaze;
     Maze m_maze;
@@ -41,6 +43,9 @@ private:
     double m_totalTime{0.0};
     int m_score{0};
     int m_highScore{0};
+
+    GhostMode m_waveMode{GhostMode::Scatter};
+    float m_waveTimer{c_scatterDuration};
 };
 
 }  // namespace LifeExe::Core

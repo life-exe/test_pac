@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 #include "GameConstants.h"
 
@@ -22,15 +23,48 @@ int squaredDistance(GridPos lhs, GridPos rhs)
 
 }  // namespace
 
-Ghost::Ghost(const GhostConfig& config)
-    : m_id{config.id}, m_mover{config.spawn, Direction::Left}, m_scatterCorner{config.scatterCorner}, m_inHouse{config.inHouse},
-      m_releaseDelay{config.releaseDelay}
+Ghost::Ghost(const GhostConfig& config) : Ghost{config, nullptr} {}
+
+Ghost::Ghost(const GhostConfig& config, GhostStrategy strategy)
+    : m_id{config.id}, m_mover{config.spawn, Direction::Left}, m_scatterCorner{config.scatterCorner}, m_strategy{std::move(strategy)},
+      m_inHouse{config.inHouse}, m_releaseDelay{config.releaseDelay}
 {
 }
 
 void Ghost::update(const Maze& maze, float dt)
 {
     updateToward(maze, dt, m_scatterCorner);
+}
+
+void Ghost::update(const Maze& maze, float dt, const GhostContext& context)
+{
+    updateToward(maze, dt, resolveTarget(context));
+}
+
+void Ghost::setMode(GhostMode mode, const Maze& maze)
+{
+    if (m_mode == mode)
+    {
+        return;
+    }
+    m_mode = mode;
+    if (!m_inHouse)
+    {
+        const bool atCentre{m_mover.progress() == 0.0f};
+        if (m_mover.reverse(maze, currentMover()) && atCentre)
+        {
+            m_holdReversedDirection = true;
+        }
+    }
+}
+
+GridPos Ghost::resolveTarget(const GhostContext& context) const
+{
+    if (m_mode == GhostMode::Chase && m_strategy)
+    {
+        return m_strategy(context);
+    }
+    return m_scatterCorner;
 }
 
 void Ghost::updateToward(const Maze& maze, float dt, GridPos targetTile)
@@ -63,7 +97,17 @@ void Ghost::updateToward(const Maze& maze, float dt, GridPos targetTile)
         Direction requested{Direction::None};
         if (m_mover.progress() == 0.0f)
         {
-            requested = chooseNextDirection(maze, effectiveTarget);
+            if (m_holdReversedDirection)
+            {
+                if (distance > 0.0f)
+                {
+                    m_holdReversedDirection = false;
+                }
+            }
+            else
+            {
+                requested = chooseNextDirection(maze, effectiveTarget);
+            }
         }
 
         if (!m_mover.stepCell(maze, currentMover(), distance, requested))

@@ -22,6 +22,7 @@ struct GhostSnapshot
     GhostId id{GhostId::Ruby};
     Vec2f position;
     Direction direction{Direction::None};
+    GhostMode mode{GhostMode::Scatter};
 };
 
 // Read-only frame snapshot; tiles views core memory until the next update, handleCommand or reset.

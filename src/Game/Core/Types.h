@@ -122,4 +122,20 @@ constexpr GridPos directionDelta(Direction direction)
     return {0, 0};
 }
 
+enum class GhostMode : std::uint8_t
+{
+    Scatter = 0,
+    Chase
+};
+
+constexpr std::string_view toString(GhostMode mode)
+{
+    switch (mode)
+    {
+        case GhostMode::Scatter: return "Scatter";
+        case GhostMode::Chase: return "Chase";
+    }
+    return "Unknown";
+}
+
 }  // namespace LifeExe::Core

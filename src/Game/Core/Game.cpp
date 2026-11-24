@@ -4,9 +4,9 @@
 #include <array>
 #include <cstddef>
 #include <utility>
-
 #include "GameConstants.h"
 #include "Level.h"
+#include "GhostStrategy.h"
 
 namespace LifeExe::Core
 {
@@ -35,10 +35,10 @@ GhostConfig makeGhostConfig(const Maze& maze, GhostId id, bool inHouse, float re
 // Order matches GhostId, so m_ghosts can be indexed by it; Ruby starts outside and the rest leave the house in turn
 std::array<Ghost, 4> makeGhosts(const Maze& maze)
 {
-    return {Ghost{makeGhostConfig(maze, GhostId::Ruby, false, 0.0f)},
-        Ghost{makeGhostConfig(maze, GhostId::Rosie, true, c_rosieReleaseDelay)},
-        Ghost{makeGhostConfig(maze, GhostId::Indigo, true, c_indigoReleaseDelay)},
-        Ghost{makeGhostConfig(maze, GhostId::Coral, true, c_coralReleaseDelay)}};
+    return {Ghost{makeGhostConfig(maze, GhostId::Ruby, false, 0.0f), rubyStrategy},
+        Ghost{makeGhostConfig(maze, GhostId::Rosie, true, c_rosieReleaseDelay), rosieStrategy},
+        Ghost{makeGhostConfig(maze, GhostId::Indigo, true, c_indigoReleaseDelay), indigoStrategy},
+        Ghost{makeGhostConfig(maze, GhostId::Coral, true, c_coralReleaseDelay), coralStrategy}};
 }
 
 }  // namespace
@@ -128,6 +128,8 @@ void Game::reset()
     m_maze = m_initialMaze;
     m_player = Player{m_maze.playerSpawn()};
     m_ghosts = makeGhosts(m_maze);
+    m_waveMode = GhostMode::Scatter;
+    m_waveTimer = c_scatterDuration;
 }
 
 void Game::setHighScore(int highScore)
@@ -156,11 +158,50 @@ GameSnapshot Game::snapshot() const
 void Game::updateSubstep(float stepDt)
 {
     m_player.update(m_maze, stepDt);
+
+    const GridPos playerTile{m_player.tile()};
+    const Direction playerDir{m_player.direction()};
+    const GridPos rubyTile{m_ghosts[0].tile()};
     for (Ghost& ghost : m_ghosts)
     {
-        ghost.update(m_maze, stepDt);
+        const GhostContext context{.playerPos = playerTile,
+            .playerDir = playerDir,
+            .rubyPos = rubyTile,
+            .ghostPos = ghost.tile(),
+            .scatterCorner = ghost.scatterCorner()};
+        ghost.update(m_maze, stepDt, context);
     }
+
     consumePelletAtPlayer();
+    if (m_state == GameState::Playing)
+    {
+        updateWaveTimer(stepDt);
+    }
+}
+
+void Game::updateWaveTimer(float stepDt)
+{
+    m_waveTimer -= stepDt;
+    if (m_waveTimer > 0.0f)
+    {
+        return;
+    }
+
+    if (m_waveMode == GhostMode::Scatter)
+    {
+        m_waveMode = GhostMode::Chase;
+        m_waveTimer = c_chaseDuration;
+    }
+    else
+    {
+        m_waveMode = GhostMode::Scatter;
+        m_waveTimer = c_scatterDuration;
+    }
+
+    for (Ghost& ghost : m_ghosts)
+    {
+        ghost.setMode(m_waveMode, m_maze);
+    }
 }
 
 std::array<GhostSnapshot, 4> Game::ghostSnapshots() const
@@ -169,7 +210,7 @@ std::array<GhostSnapshot, 4> Game::ghostSnapshots() const
     for (std::size_t index{0}; index < m_ghosts.size(); ++index)
     {
         const Ghost& ghost{m_ghosts[index]};
-        snapshots[index] = {.id = ghost.id(), .position = ghost.position(), .direction = ghost.direction()};
+        snapshots[index] = {.id = ghost.id(), .position = ghost.position(), .direction = ghost.direction(), .mode = ghost.mode()};
     }
     return snapshots;
 }
