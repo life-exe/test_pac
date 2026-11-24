@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <memory>
 #include <string_view>
 
 #include "Game.h"
 #include "GameConstants.h"
 #include "Maze.h"
+#include "RandomSource.h"
 #include "TestHelpers.h"
 #include "Types.h"
 
@@ -153,6 +155,91 @@ void expectAtSpawns(const Core::GameSnapshot& snapshot, const Core::Maze& maze)
         expectSamePosition(ghost.position, centreOf(maze.ghostSpawn(ghost.id)));
     }
 }
+
+// Always picks the same candidate index, so Frightened choices are reproducible
+class FixedRandomSource final : public Core::IRandomSource
+{
+public:
+    explicit FixedRandomSource(std::size_t index) : m_index{index} {}
+
+    std::size_t nextIndex(std::size_t count) override { return count == 0 ? 0 : m_index % count; }
+
+private:
+    std::size_t m_index{0};
+};
+
+Core::Game makeFixedRandomGame(std::string_view asciiMap)
+{
+    return Tests::makePlayingGame(asciiMap, std::make_unique<FixedRandomSource>(0));
+}
+
+const Core::GhostSnapshot& ghostOf(const Core::GameSnapshot& snapshot, Core::GhostId id)
+{
+    return snapshot.ghosts[static_cast<std::size_t>(id)];
+}
+
+// Advances in substeps until the predicate holds for the snapshot; `before` keeps the snapshot of the step
+// that made it true, so a test can compare the state just before and just after one event
+template <typename Predicate>
+bool stepUntil(Core::Game& game, Predicate predicate, Core::GameSnapshot& before, int maxSteps = c_maxPhaseSteps)
+{
+    for (int step{0}; step < maxSteps; ++step)
+    {
+        if (predicate(game.snapshot()))
+        {
+            return true;
+        }
+        before = game.snapshot();
+        game.update(Core::c_maxSubstep);
+    }
+    return predicate(game.snapshot());
+}
+
+bool isFrightenedActive(const Core::GameSnapshot& snapshot)
+{
+    return snapshot.frightenedTimer > 0.0f;
+}
+
+bool isFrightenedOver(const Core::GameSnapshot& snapshot)
+{
+    return snapshot.frightenedTimer <= 0.0f;
+}
+
+bool isRubyEaten(const Core::GameSnapshot& snapshot)
+{
+    return ghostOf(snapshot, Core::GhostId::Ruby).mode == Core::GhostMode::Eaten;
+}
+
+// A ring of corridors without dead ends for the ghosts, so a reversal can only come from a mode change;
+// the player has a separate row with a power pellet right ahead and no way to the ghosts
+constexpr std::string_view c_frightenedRingLevel{"###########\n"
+                                                 "#....1....#\n"
+                                                 "#.###=###.#\n"
+                                                 "#.# 234 #.#\n"
+                                                 "#.#######.#\n"
+                                                 "#.........#\n"
+                                                 "###########\n"
+                                                 "#.Po......#\n"
+                                                 "###########\n"};
+
+// Ruby walks left towards the player; the corridor between them is empty, so only the ghost changes the score.
+// A second power pellet waits further right to be eaten while Ruby is still Eaten
+constexpr std::string_view c_eatGhostLevel{"############\n"
+                                           "#.Po    o.1#\n"
+                                           "##=#########\n"
+                                           "#234########\n"
+                                           "############\n"};
+
+constexpr Core::GridPos c_secondPowerPellet{1, 8};
+
+// The player eats the power pellet above the door and stops in the dead end on the left, where Ruby is caught.
+// The revived Ruby scatters to the ring on the right and never comes back, while Frightened Rosie leaves the
+// house, takes the first candidate (Left) and walks into the player
+constexpr std::string_view c_comboLevel{"##########\n"
+                                        "#1 oP....#\n"
+                                        "###=# ## #\n"
+                                        "#423#    #\n"
+                                        "##########\n"};
 
 }  // namespace
 
@@ -555,4 +642,119 @@ TEST(GameRoundTest, ResetRestoresLivesAndReadyPhase)
     EXPECT_FLOAT_EQ(snapshot.phaseTimeLeft, Core::c_readyDuration);
     EXPECT_EQ(snapshot.lives, Core::c_startingLives);
     EXPECT_EQ(snapshot.score, 0);
+}
+
+// --- Frightened buff and Eaten ghosts ---
+
+TEST(GameBuffTest, GhostModeToStringBuffs)
+{
+    EXPECT_EQ(Core::toString(Core::GhostMode::Frightened), "Frightened");
+    EXPECT_EQ(Core::toString(Core::GhostMode::Eaten), "Eaten");
+}
+
+TEST(GameBuffTest, PowerPelletFrightensAndReversesOnlyOutsideHouse)
+{
+    Core::Game game{makeFixedRandomGame(c_frightenedRingLevel)};
+    // Rosie is already on her way out, so a reversal inside the house would show
+    game.update(Core::c_rosieReleaseDelay + 0.1f);
+    ASSERT_EQ(ghostOf(game.snapshot(), Core::GhostId::Rosie).direction, Core::Direction::Right);
+
+    game.handleCommand(Core::Command::MoveRight);
+    Core::GameSnapshot before{};
+    ASSERT_TRUE(stepUntil(game, isFrightenedActive, before));
+
+    const Core::GameSnapshot after{game.snapshot()};
+    expectAllGhostsInMode(game, Core::GhostMode::Frightened);
+    EXPECT_NEAR(after.frightenedTimer, Core::c_frightenedDuration, Core::c_maxSubstep);
+    EXPECT_EQ(ghostOf(after, Core::GhostId::Ruby).direction, Core::opposite(ghostOf(before, Core::GhostId::Ruby).direction));
+    EXPECT_EQ(ghostOf(after, Core::GhostId::Rosie).direction, ghostOf(before, Core::GhostId::Rosie).direction);
+}
+
+TEST(GameBuffTest, FrightenedPausesWaveAndExpiresWithoutReverse)
+{
+    Core::Game game{makeFixedRandomGame(c_frightenedRingLevel)};
+    const double activeStart{game.totalTime()};
+    game.handleCommand(Core::Command::MoveRight);
+    Core::GameSnapshot before{};
+    ASSERT_TRUE(stepUntil(game, isFrightenedActive, before));
+    const auto waveElapsed{static_cast<float>(before.totalTime - activeStart)};
+
+    ASSERT_TRUE(stepUntil(game, isFrightenedOver, before));
+    const Core::GameSnapshot expired{game.snapshot()};
+    // The buff outlasted the Scatter wave; with a running wave timer the ghosts would come back in Chase
+    expectAllGhostsInMode(game, Core::GhostMode::Scatter);
+    // The ring has no dead ends, so the only possible reversal would come from the expiry itself
+    EXPECT_NE(ghostOf(expired, Core::GhostId::Ruby).direction, Core::opposite(ghostOf(before, Core::GhostId::Ruby).direction));
+
+    // The paused wave resumes with exactly the Scatter time it had left
+    game.update(Core::c_scatterDuration - waveElapsed - c_waveMargin);
+    expectAllGhostsInMode(game, Core::GhostMode::Scatter);
+    game.update(2.0f * c_waveMargin);
+    expectAllGhostsInMode(game, Core::GhostMode::Chase);
+    EXPECT_EQ(game.snapshot().lives, Core::c_startingLives);
+}
+
+TEST(GameBuffTest, EatingFrightenedGhostAndEatenSafety)
+{
+    Core::Game game{makeFixedRandomGame(c_eatGhostLevel)};
+    Core::GameSnapshot before{};
+    // The player waits until Ruby is close, so the chase after the power pellet is short
+    ASSERT_TRUE(stepUntil(
+        game, [](const Core::GameSnapshot& snapshot) { return ghostOf(snapshot, Core::GhostId::Ruby).position.x < 5.0f; }, before));
+    game.handleCommand(Core::Command::MoveRight);
+    ASSERT_TRUE(stepUntil(game, isFrightenedActive, before));
+
+    ASSERT_TRUE(stepUntil(game, isRubyEaten, before));
+    const Core::GameSnapshot atEat{game.snapshot()};
+    EXPECT_EQ(atEat.score - before.score, Core::c_baseGhostEatScore);
+    EXPECT_EQ(atEat.lives, Core::c_startingLives);
+    EXPECT_EQ(atEat.roundPhase, Core::RoundPhase::Active);
+
+    // A second power pellet frightens the house ghosts again, but the eyes keep flying home
+    ASSERT_TRUE(stepUntil(
+        game, [](const Core::GameSnapshot& snapshot) { return tileAt(snapshot, c_secondPowerPellet) == Core::TileType::Empty; }, before));
+    const Core::GameSnapshot secondBuff{game.snapshot()};
+    EXPECT_EQ(ghostOf(secondBuff, Core::GhostId::Ruby).mode, Core::GhostMode::Eaten);
+    for (const Core::GhostId id : {Core::GhostId::Rosie, Core::GhostId::Indigo, Core::GhostId::Coral})
+    {
+        EXPECT_EQ(ghostOf(secondBuff, id).mode, Core::GhostMode::Frightened) << "ghost " << static_cast<int>(id);
+    }
+    EXPECT_NEAR(secondBuff.frightenedTimer, Core::c_frightenedDuration, Core::c_maxSubstep);
+
+    // On the way back the eyes fly through the player without a collision
+    bool crossedPlayer{false};
+    ASSERT_TRUE(stepUntil(
+        game,
+        [&crossedPlayer](const Core::GameSnapshot& snapshot)
+        {
+            const Core::GhostSnapshot& ruby{ghostOf(snapshot, Core::GhostId::Ruby)};
+            crossedPlayer = crossedPlayer || (ruby.mode == Core::GhostMode::Eaten && ruby.position.x < snapshot.player.position.x);
+            return ruby.mode != Core::GhostMode::Eaten || snapshot.lives < Core::c_startingLives;
+        },
+        before));
+    const Core::GameSnapshot revived{game.snapshot()};
+    EXPECT_TRUE(crossedPlayer);
+    EXPECT_EQ(revived.lives, Core::c_startingLives);
+    EXPECT_EQ(revived.roundPhase, Core::RoundPhase::Active);
+    // The revived ghost takes the current wave mode, not Frightened
+    EXPECT_EQ(ghostOf(revived, Core::GhostId::Ruby).mode, Core::GhostMode::Scatter);
+}
+
+TEST(GameBuffTest, ComboDoublesWithinOneFrightened)
+{
+    Core::Game game{makeFixedRandomGame(c_comboLevel)};
+    game.handleCommand(Core::Command::MoveLeft);
+    Core::GameSnapshot before{};
+    ASSERT_TRUE(stepUntil(game, isFrightenedActive, before));
+
+    ASSERT_TRUE(stepUntil(game, isRubyEaten, before));
+    EXPECT_EQ(game.snapshot().score - before.score, Core::c_baseGhostEatScore);
+
+    ASSERT_TRUE(stepUntil(
+        game, [](const Core::GameSnapshot& snapshot) { return ghostOf(snapshot, Core::GhostId::Rosie).mode == Core::GhostMode::Eaten; },
+        before));
+    const Core::GameSnapshot secondEat{game.snapshot()};
+    EXPECT_EQ(secondEat.score - before.score, 2 * Core::c_baseGhostEatScore);
+    EXPECT_EQ(secondEat.lives, Core::c_startingLives);
+    EXPECT_GT(secondEat.frightenedTimer, 0.0f);
 }

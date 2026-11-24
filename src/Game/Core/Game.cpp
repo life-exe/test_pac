@@ -26,30 +26,54 @@ Direction toDirection(Command command)
     }
 }
 
-GhostConfig makeGhostConfig(const Maze& maze, GhostId id, bool inHouse, float releaseDelay)
-{
-    return {
-        .id = id, .spawn = maze.ghostSpawn(id), .scatterCorner = maze.scatterCorner(id), .inHouse = inHouse, .releaseDelay = releaseDelay};
-}
-
 }  // namespace
 
 // The built-in map must be valid, so a parse error here is a programming error
 // and value() may throw
-Game::Game() : Game{Maze::fromAscii(c_classicLevel).value()} {}
+Game::Game() : Game{Maze::fromAscii(c_classicLevel).value(), std::make_unique<DefaultRandomSource>()} {}
 
-Game::Game(Maze maze)
-    : m_initialMaze{std::move(maze)}, m_maze{m_initialMaze}, m_player{m_maze.playerSpawn()}, m_ghosts{createGhosts(m_maze)}
+Game::Game(Maze maze) : Game{std::move(maze), std::make_unique<DefaultRandomSource>()} {}
+
+Game::Game(Maze maze, std::unique_ptr<IRandomSource> random)
+    : m_initialMaze{std::move(maze)}, m_maze{m_initialMaze}, m_player{m_maze.playerSpawn()}, m_ghosts{createGhosts(m_maze)},
+      m_random{random ? std::move(random) : std::make_unique<DefaultRandomSource>()}
 {
 }
 
 // Order matches GhostId, so m_ghosts can be indexed by it; Ruby starts outside and the rest leave the house in turn
 std::array<Ghost, 4> Game::createGhosts(const Maze& maze)
 {
-    return {Ghost{makeGhostConfig(maze, GhostId::Ruby, false, 0.0f), rubyStrategy},
-        Ghost{makeGhostConfig(maze, GhostId::Rosie, true, c_rosieReleaseDelay), rosieStrategy},
-        Ghost{makeGhostConfig(maze, GhostId::Indigo, true, c_indigoReleaseDelay), indigoStrategy},
-        Ghost{makeGhostConfig(maze, GhostId::Coral, true, c_coralReleaseDelay), coralStrategy}};
+    const GridPos houseCenter{maze.ghostSpawn(GhostId::Indigo)};
+    return {
+        Ghost{{.id = GhostId::Ruby,
+                  .spawn = maze.ghostSpawn(GhostId::Ruby),
+                  .scatterCorner = maze.scatterCorner(GhostId::Ruby),
+                  .inHouse = false,
+                  .releaseDelay = 0.0f,
+                  .homeTile = houseCenter},
+            rubyStrategy},
+        Ghost{{.id = GhostId::Rosie,
+                  .spawn = maze.ghostSpawn(GhostId::Rosie),
+                  .scatterCorner = maze.scatterCorner(GhostId::Rosie),
+                  .inHouse = true,
+                  .releaseDelay = c_rosieReleaseDelay,
+                  .homeTile = houseCenter},
+            rosieStrategy},
+        Ghost{{.id = GhostId::Indigo,
+                  .spawn = maze.ghostSpawn(GhostId::Indigo),
+                  .scatterCorner = maze.scatterCorner(GhostId::Indigo),
+                  .inHouse = true,
+                  .releaseDelay = c_indigoReleaseDelay,
+                  .homeTile = houseCenter},
+            indigoStrategy},
+        Ghost{{.id = GhostId::Coral,
+                  .spawn = maze.ghostSpawn(GhostId::Coral),
+                  .scatterCorner = maze.scatterCorner(GhostId::Coral),
+                  .inHouse = true,
+                  .releaseDelay = c_coralReleaseDelay,
+                  .homeTile = houseCenter},
+            coralStrategy},
+    };
 }
 
 void Game::update(float dt)
@@ -154,7 +178,8 @@ GameSnapshot Game::snapshot() const
         .remainingPellets = m_maze.remainingPellets(),
         .lives = m_lives,
         .roundPhase = m_roundPhase,
-        .phaseTimeLeft = m_phaseTimer};
+        .phaseTimeLeft = m_phaseTimer,
+        .frightenedTimer = m_frightenedTimer};
 }
 
 void Game::updateSubstep(float stepDt)
@@ -177,7 +202,7 @@ void Game::updateSubstep(float stepDt)
             .rubyPos = rubyTile,
             .ghostPos = ghost.tile(),
             .scatterCorner = ghost.scatterCorner()};
-        ghost.update(m_maze, stepDt, context);
+        ghost.update(m_maze, stepDt, {.context = context, .random = *m_random, .waveMode = m_waveMode});
     }
 
     consumePelletAtPlayer();
@@ -187,7 +212,16 @@ void Game::updateSubstep(float stepDt)
     }
 
     checkGhostCollisions();
-    if (m_roundPhase == RoundPhase::Active)
+    if (m_roundPhase != RoundPhase::Active)
+    {
+        return;
+    }
+
+    if (m_frightenedTimer > 0.0f)
+    {
+        updateFrightenedTimer(stepDt);
+    }
+    else
     {
         updateWaveTimer(stepDt);
     }
@@ -214,7 +248,10 @@ void Game::updateWaveTimer(float stepDt)
 
     for (Ghost& ghost : m_ghosts)
     {
-        ghost.setMode(m_waveMode, m_maze);
+        if (ghost.mode() != GhostMode::Eaten && ghost.mode() != GhostMode::Frightened)
+        {
+            ghost.setMode(m_waveMode, m_maze, true);
+        }
     }
 }
 
@@ -244,6 +281,7 @@ void Game::consumePelletAtPlayer()
     else if (eaten == TileType::PowerPellet)
     {
         m_score += c_powerPelletScore;
+        activateFrightened();
     }
     m_highScore = std::max(m_highScore, m_score);
 
@@ -280,15 +318,27 @@ void Game::advancePhaseTimer(float stepDt)
 
 void Game::checkGhostCollisions()
 {
-    for (const Ghost& ghost : m_ghosts)
+    for (Ghost& ghost : m_ghosts)
     {
-        if (moversCollide(m_player.mover(), ghost.mover()))
+        if (ghost.mode() == GhostMode::Eaten || !moversCollide(m_player.mover(), ghost.mover()))
         {
-            --m_lives;
-            m_roundPhase = RoundPhase::PlayerDying;
-            m_phaseTimer = c_dyingDuration;
-            return;
+            continue;
         }
+
+        if (ghost.mode() == GhostMode::Frightened)
+        {
+            ghost.setMode(GhostMode::Eaten, m_maze, false);
+            const int shift{std::clamp(m_eatenGhostCombo, 0, 3)};
+            m_score += c_baseGhostEatScore * (1 << shift);
+            m_highScore = std::max(m_highScore, m_score);
+            ++m_eatenGhostCombo;
+            continue;
+        }
+
+        --m_lives;
+        m_roundPhase = RoundPhase::PlayerDying;
+        m_phaseTimer = c_dyingDuration;
+        return;
     }
 }
 
@@ -296,10 +346,44 @@ void Game::respawnRound()
 {
     m_waveMode = GhostMode::Scatter;
     m_waveTimer = c_scatterDuration;
+    m_frightenedTimer = 0.0f;
+    m_eatenGhostCombo = 0;
     m_roundPhase = RoundPhase::Ready;
     m_phaseTimer = c_readyDuration;
     m_player = Player{m_maze.playerSpawn()};
     m_ghosts = createGhosts(m_maze);
+}
+
+void Game::activateFrightened()
+{
+    m_frightenedTimer = c_frightenedDuration;
+    m_eatenGhostCombo = 0;
+    for (Ghost& ghost : m_ghosts)
+    {
+        if (ghost.mode() != GhostMode::Eaten)
+        {
+            ghost.setMode(GhostMode::Frightened, m_maze, true);
+        }
+    }
+}
+
+void Game::updateFrightenedTimer(float stepDt)
+{
+    m_frightenedTimer -= stepDt;
+    if (m_frightenedTimer > 0.0f)
+    {
+        return;
+    }
+
+    m_frightenedTimer = 0.0f;
+    m_eatenGhostCombo = 0;
+    for (Ghost& ghost : m_ghosts)
+    {
+        if (ghost.mode() == GhostMode::Frightened)
+        {
+            ghost.setMode(m_waveMode, m_maze, false);
+        }
+    }
 }
 
 }  // namespace LifeExe::Core

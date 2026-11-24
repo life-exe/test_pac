@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <memory>
 
 #include "Command.h"
 #include "GameSnapshot.h"
@@ -18,6 +19,7 @@ class Game
 public:
     Game();
     explicit Game(Maze maze);
+    Game(Maze maze, std::unique_ptr<IRandomSource> random);
 
     void update(float dt);
     void handleCommand(Command command);
@@ -37,6 +39,8 @@ private:
     void advancePhaseTimer(float stepDt);
     void checkGhostCollisions();
     void respawnRound();
+    void updateFrightenedTimer(float stepDt);
+    void activateFrightened();
 
     Maze m_initialMaze;
     Maze m_maze;
@@ -54,6 +58,10 @@ private:
     RoundPhase m_roundPhase{RoundPhase::Ready};
     float m_phaseTimer{c_readyDuration};
     int m_lives{c_startingLives};
+
+    std::unique_ptr<IRandomSource> m_random;
+    float m_frightenedTimer{0.0f};
+    int m_eatenGhostCombo{0};
 };
 
 }  // namespace LifeExe::Core

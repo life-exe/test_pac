@@ -16,5 +16,10 @@ inline constexpr float c_chaseDuration{20.0f};      // seconds
 inline constexpr int c_startingLives{3};
 inline constexpr float c_readyDuration{1.5f};  // seconds
 inline constexpr float c_dyingDuration{1.0f};  // seconds
+inline constexpr float c_frightenedSpeedMultiplier{0.5f};
+inline constexpr float c_eatenSpeedMultiplier{2.0f};
+inline constexpr float c_frightenedDuration{7.0f};   // seconds
+inline constexpr float c_frightenedFlashTime{2.0f};  // seconds before frightened ends
+inline constexpr int c_baseGhostEatScore{200};
 
 }  // namespace LifeExe::Core

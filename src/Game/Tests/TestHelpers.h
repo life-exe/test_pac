@@ -1,10 +1,13 @@
 #pragma once
 
+#include <memory>
 #include <string_view>
+#include <utility>
 
 #include "Game.h"
 #include "GameConstants.h"
 #include "Maze.h"
+#include "RandomSource.h"
 #include "Types.h"
 
 namespace LifeExe::Tests
@@ -28,15 +31,27 @@ inline Core::Game makeReadyGame(std::string_view asciiMap = c_smallLevel)
     return Core::Game{Core::Maze::fromAscii(asciiMap).value()};
 }
 
-// Creates a game on the given map and advances through the initial Ready pause to RoundPhase::Active.
-inline Core::Game makePlayingGame(std::string_view asciiMap = c_smallLevel)
+// Creates a game on the given map with a custom random source and advances through Ready to Active.
+inline Core::Game makePlayingGame(std::string_view asciiMap, std::unique_ptr<Core::IRandomSource> random)
 {
-    Core::Game game{makeReadyGame(asciiMap)};
+    Core::Game game{Core::Maze::fromAscii(asciiMap).value(), std::move(random)};
     while (game.state() == Core::GameState::Playing && game.snapshot().roundPhase == Core::RoundPhase::Ready)
     {
         game.update(Core::c_maxSubstep);
     }
     return game;
+}
+
+// Creates a game on c_smallLevel with a custom random source and advances through Ready to Active.
+inline Core::Game makePlayingGame(std::unique_ptr<Core::IRandomSource> random)
+{
+    return makePlayingGame(c_smallLevel, std::move(random));
+}
+
+// Creates a game on the given map and advances through Ready to RoundPhase::Active.
+inline Core::Game makePlayingGame(std::string_view asciiMap = c_smallLevel)
+{
+    return makePlayingGame(asciiMap, std::make_unique<Core::DefaultRandomSource>());
 }
 
 }  // namespace LifeExe::Tests

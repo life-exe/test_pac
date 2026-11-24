@@ -187,20 +187,46 @@ Color ghostTint(Core::GhostId id)
     return WHITE;
 }
 
-// One body sprite serves every ghost through the tint; the eyes are a separate layer so they keep their own colours
-void drawGhost(const Core::GhostSnapshot& ghost, const MazeLayout& layout, double totalTime, const Texture2D& spritesheet)
+// The last seconds of the buff blink as a warning; totalTime freezes on pause, and so does the blinking
+bool isFrightenedFlashing(const Core::GameSnapshot& snapshot)
 {
-    // totalTime freezes on pause, and so does the skirt
-    constexpr double skirtPhasesPerSecond{6.0};
-    const int phase{static_cast<int>(totalTime * skirtPhasesPerSecond)};
+    constexpr double flashPeriod{0.2};  // seconds per blink phase
+    if (snapshot.frightenedTimer <= 0.0f || snapshot.frightenedTimer >= Core::c_frightenedFlashTime)
+    {
+        return false;
+    }
+    return static_cast<int>(snapshot.totalTime / flashPeriod) % 2 == 1;
+}
 
+// One body sprite serves every ghost through the tint; the eyes are a separate layer so they keep their own colours
+void drawGhost(const Core::GhostSnapshot& ghost, const Core::GameSnapshot& snapshot, const MazeLayout& layout, const Texture2D& spritesheet)
+{
     const auto size{static_cast<float>(layout.tileSize)};
     const Rectangle dest{static_cast<float>(layout.originX) + (ghost.position.x * size),
         static_cast<float>(layout.originY) + (ghost.position.y * size), size, size};
     // position is the tile centre, so the sprite is anchored by its centre
     const Vector2 origin{size * 0.5f, size * 0.5f};
+    const Rectangle eyes{toRectangle(ghostEyesFrame(ghost.direction))};
+
+    switch (ghost.mode)
+    {
+        case Core::GhostMode::Frightened:
+            // The frightened frame has its own colours and face, so it is drawn untinted and without the eyes layer
+            DrawTexturePro(spritesheet, toRectangle(ghostFrightenedFrame(isFrightenedFlashing(snapshot))), dest, origin, 0.0f, WHITE);
+            return;
+        case Core::GhostMode::Eaten:
+            // Only the eyes fly home, so the player sees at once that this ghost is harmless
+            DrawTexturePro(spritesheet, eyes, dest, origin, 0.0f, WHITE);
+            return;
+        case Core::GhostMode::Scatter:
+        case Core::GhostMode::Chase: break;
+    }
+
+    // totalTime freezes on pause, and so does the skirt
+    constexpr double skirtPhasesPerSecond{6.0};
+    const int phase{static_cast<int>(snapshot.totalTime * skirtPhasesPerSecond)};
     DrawTexturePro(spritesheet, toRectangle(ghostBodyFrame(phase)), dest, origin, 0.0f, ghostTint(ghost.id));
-    DrawTexturePro(spritesheet, toRectangle(ghostEyesFrame(ghost.direction)), dest, origin, 0.0f, WHITE);
+    DrawTexturePro(spritesheet, eyes, dest, origin, 0.0f, WHITE);
 }
 
 // In Ready every ghost stands on its spawn, so the lowest ghost marks the house floor:
@@ -396,7 +422,7 @@ void RaylibRenderer::render(const Core::GameSnapshot& snapshot) const
         {
             for (const Core::GhostSnapshot& ghost : snapshot.ghosts)
             {
-                drawGhost(ghost, layout, snapshot.totalTime, m_spritesheet);
+                drawGhost(ghost, snapshot, layout, m_spritesheet);
             }
         }
         if (snapshot.state == Core::GameState::Playing && snapshot.roundPhase == Core::RoundPhase::Ready)
