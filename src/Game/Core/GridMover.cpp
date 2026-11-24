@@ -27,6 +27,23 @@ bool canEnter(const Maze& maze, Mover mover, GridPos from, Direction direction)
     return maze.tileAt(from) == TileType::Tunnel && !isInside(maze, target) && target.row == from.row;
 }
 
+bool moversCollide(const GridMover& first, const GridMover& second)
+{
+    if (first.collisionTile() == second.collisionTile())
+    {
+        return true;
+    }
+    const Direction firstDir{first.direction()};
+    const Direction secondDir{second.direction()};
+    if (firstDir == Direction::None || firstDir != opposite(secondDir))
+    {
+        return false;
+    }
+    const GridPos firstNext{first.tile() + directionDelta(firstDir)};
+    const GridPos secondNext{second.tile() + directionDelta(secondDir)};
+    return firstNext == second.tile() && secondNext == first.tile() && (first.progress() + second.progress()) >= 1.0f;
+}
+
 GridMover::GridMover(GridPos tile, Direction facing) : m_tile{tile}, m_facing{facing} {}
 
 void GridMover::update(const Maze& maze, const MoveStep& step, Direction& requested)
@@ -157,6 +174,15 @@ bool GridMover::reverse(const Maze& maze, Mover mover)
     m_currentDirection = reversed;
     m_facing = reversed;
     return true;
+}
+
+GridPos GridMover::collisionTile() const
+{
+    if (m_progress >= 0.5f && m_currentDirection != Direction::None)
+    {
+        return m_tile + directionDelta(m_currentDirection);
+    }
+    return m_tile;
 }
 
 }  // namespace LifeExe::Core

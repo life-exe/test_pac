@@ -32,23 +32,24 @@ GhostConfig makeGhostConfig(const Maze& maze, GhostId id, bool inHouse, float re
         .id = id, .spawn = maze.ghostSpawn(id), .scatterCorner = maze.scatterCorner(id), .inHouse = inHouse, .releaseDelay = releaseDelay};
 }
 
-// Order matches GhostId, so m_ghosts can be indexed by it; Ruby starts outside and the rest leave the house in turn
-std::array<Ghost, 4> makeGhosts(const Maze& maze)
-{
-    return {Ghost{makeGhostConfig(maze, GhostId::Ruby, false, 0.0f), rubyStrategy},
-        Ghost{makeGhostConfig(maze, GhostId::Rosie, true, c_rosieReleaseDelay), rosieStrategy},
-        Ghost{makeGhostConfig(maze, GhostId::Indigo, true, c_indigoReleaseDelay), indigoStrategy},
-        Ghost{makeGhostConfig(maze, GhostId::Coral, true, c_coralReleaseDelay), coralStrategy}};
-}
-
 }  // namespace
 
 // The built-in map must be valid, so a parse error here is a programming error
 // and value() may throw
 Game::Game() : Game{Maze::fromAscii(c_classicLevel).value()} {}
 
-Game::Game(Maze maze) : m_initialMaze{std::move(maze)}, m_maze{m_initialMaze}, m_player{m_maze.playerSpawn()}, m_ghosts{makeGhosts(m_maze)}
+Game::Game(Maze maze)
+    : m_initialMaze{std::move(maze)}, m_maze{m_initialMaze}, m_player{m_maze.playerSpawn()}, m_ghosts{createGhosts(m_maze)}
 {
+}
+
+// Order matches GhostId, so m_ghosts can be indexed by it; Ruby starts outside and the rest leave the house in turn
+std::array<Ghost, 4> Game::createGhosts(const Maze& maze)
+{
+    return {Ghost{makeGhostConfig(maze, GhostId::Ruby, false, 0.0f), rubyStrategy},
+        Ghost{makeGhostConfig(maze, GhostId::Rosie, true, c_rosieReleaseDelay), rosieStrategy},
+        Ghost{makeGhostConfig(maze, GhostId::Indigo, true, c_indigoReleaseDelay), indigoStrategy},
+        Ghost{makeGhostConfig(maze, GhostId::Coral, true, c_coralReleaseDelay), coralStrategy}};
 }
 
 void Game::update(float dt)
@@ -110,7 +111,7 @@ void Game::handleCommand(Command command)
         case Command::MoveDown:
         case Command::MoveLeft:
         case Command::MoveRight:
-            if (m_state == GameState::Playing)
+            if (m_state == GameState::Playing && m_roundPhase != RoundPhase::PlayerDying)
             {
                 m_player.queueDirection(toDirection(command));
             }
@@ -125,11 +126,9 @@ void Game::reset()
     m_state = GameState::Playing;
     m_totalTime = 0.0;
     m_score = 0;
+    m_lives = c_startingLives;
     m_maze = m_initialMaze;
-    m_player = Player{m_maze.playerSpawn()};
-    m_ghosts = makeGhosts(m_maze);
-    m_waveMode = GhostMode::Scatter;
-    m_waveTimer = c_scatterDuration;
+    respawnRound();
 }
 
 void Game::setHighScore(int highScore)
@@ -152,11 +151,20 @@ GameSnapshot Game::snapshot() const
         .ghosts = ghostSnapshots(),
         .score = m_score,
         .highScore = m_highScore,
-        .remainingPellets = m_maze.remainingPellets()};
+        .remainingPellets = m_maze.remainingPellets(),
+        .lives = m_lives,
+        .roundPhase = m_roundPhase,
+        .phaseTimeLeft = m_phaseTimer};
 }
 
 void Game::updateSubstep(float stepDt)
 {
+    if (m_roundPhase != RoundPhase::Active)
+    {
+        advancePhaseTimer(stepDt);
+        return;
+    }
+
     m_player.update(m_maze, stepDt);
 
     const GridPos playerTile{m_player.tile()};
@@ -173,7 +181,13 @@ void Game::updateSubstep(float stepDt)
     }
 
     consumePelletAtPlayer();
-    if (m_state == GameState::Playing)
+    if (m_state != GameState::Playing)
+    {
+        return;
+    }
+
+    checkGhostCollisions();
+    if (m_roundPhase == RoundPhase::Active)
     {
         updateWaveTimer(stepDt);
     }
@@ -237,6 +251,55 @@ void Game::consumePelletAtPlayer()
     {
         m_state = GameState::Victory;
     }
+}
+
+void Game::advancePhaseTimer(float stepDt)
+{
+    m_phaseTimer -= stepDt;
+    if (m_phaseTimer > 0.0f)
+    {
+        return;
+    }
+
+    m_phaseTimer = 0.0f;
+    if (m_roundPhase == RoundPhase::Ready)
+    {
+        m_roundPhase = RoundPhase::Active;
+        return;
+    }
+
+    if (m_lives > 0)
+    {
+        respawnRound();
+    }
+    else
+    {
+        m_state = GameState::GameOver;
+    }
+}
+
+void Game::checkGhostCollisions()
+{
+    for (const Ghost& ghost : m_ghosts)
+    {
+        if (moversCollide(m_player.mover(), ghost.mover()))
+        {
+            --m_lives;
+            m_roundPhase = RoundPhase::PlayerDying;
+            m_phaseTimer = c_dyingDuration;
+            return;
+        }
+    }
+}
+
+void Game::respawnRound()
+{
+    m_waveMode = GhostMode::Scatter;
+    m_waveTimer = c_scatterDuration;
+    m_roundPhase = RoundPhase::Ready;
+    m_phaseTimer = c_readyDuration;
+    m_player = Player{m_maze.playerSpawn()};
+    m_ghosts = createGhosts(m_maze);
 }
 
 }  // namespace LifeExe::Core

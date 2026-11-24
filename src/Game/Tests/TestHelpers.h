@@ -3,7 +3,9 @@
 #include <string_view>
 
 #include "Game.h"
+#include "GameConstants.h"
 #include "Maze.h"
+#include "Types.h"
 
 namespace LifeExe::Tests
 {
@@ -20,10 +22,21 @@ inline constexpr std::string_view c_smallLevel{"###########\n"
                                                "#.........#\n"
                                                "###########\n"};
 
-// Creates a game on the given map and returns it ready to play
-inline Core::Game makePlayingGame(std::string_view asciiMap = c_smallLevel)
+// Creates a game on the given map in Playing / RoundPhase::Ready (without skipping the Ready pause).
+inline Core::Game makeReadyGame(std::string_view asciiMap = c_smallLevel)
 {
     return Core::Game{Core::Maze::fromAscii(asciiMap).value()};
+}
+
+// Creates a game on the given map and advances through the initial Ready pause to RoundPhase::Active.
+inline Core::Game makePlayingGame(std::string_view asciiMap = c_smallLevel)
+{
+    Core::Game game{makeReadyGame(asciiMap)};
+    while (game.state() == Core::GameState::Playing && game.snapshot().roundPhase == Core::RoundPhase::Ready)
+    {
+        game.update(Core::c_maxSubstep);
+    }
+    return game;
 }
 
 }  // namespace LifeExe::Tests

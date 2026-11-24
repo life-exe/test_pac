@@ -267,11 +267,12 @@ TEST(MazeAcceptance, DefaultGameUsesTheClassicLevel)
 TEST(MazeAcceptance, SnapshotKeepsPreviousFields)
 {
     Core::Game game{Tests::makePlayingGame()};
+    const double before{game.totalTime()};
     game.update(0.5f);
     const Core::GameSnapshot snapshot{game.snapshot()};
 
     EXPECT_EQ(snapshot.state, Core::GameState::Playing);
-    EXPECT_DOUBLE_EQ(snapshot.totalTime, 0.5);
+    EXPECT_NEAR(snapshot.totalTime - before, 0.5, 1e-6);
 }
 
 TEST(MazeAcceptance, HelperCreatesGameOnGivenMap)

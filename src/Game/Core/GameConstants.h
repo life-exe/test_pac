@@ -13,5 +13,8 @@ inline constexpr float c_indigoReleaseDelay{6.0f};  // seconds
 inline constexpr float c_coralReleaseDelay{9.0f};   // seconds
 inline constexpr float c_scatterDuration{7.0f};     // seconds
 inline constexpr float c_chaseDuration{20.0f};      // seconds
+inline constexpr int c_startingLives{3};
+inline constexpr float c_readyDuration{1.5f};  // seconds
+inline constexpr float c_dyingDuration{1.0f};  // seconds
 
 }  // namespace LifeExe::Core

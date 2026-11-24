@@ -29,10 +29,14 @@ public:
     GameSnapshot snapshot() const;
 
 private:
+    static std::array<Ghost, 4> createGhosts(const Maze& maze);
     void updateSubstep(float stepDt);
     void consumePelletAtPlayer();
     std::array<GhostSnapshot, 4> ghostSnapshots() const;
     void updateWaveTimer(float stepDt);
+    void advancePhaseTimer(float stepDt);
+    void checkGhostCollisions();
+    void respawnRound();
 
     Maze m_initialMaze;
     Maze m_maze;
@@ -46,6 +50,10 @@ private:
 
     GhostMode m_waveMode{GhostMode::Scatter};
     float m_waveTimer{c_scatterDuration};
+
+    RoundPhase m_roundPhase{RoundPhase::Ready};
+    float m_phaseTimer{c_readyDuration};
+    int m_lives{c_startingLives};
 };
 
 }  // namespace LifeExe::Core
