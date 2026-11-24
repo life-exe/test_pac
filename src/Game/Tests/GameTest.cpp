@@ -45,6 +45,18 @@ Core::TileType tileAt(const Core::GameSnapshot& snapshot, Core::GridPos pos)
     return snapshot.tiles[index];
 }
 
+// Every ghost receives the wave mode, including those still in the house
+void expectAllGhostsInMode(const Core::Game& game, Core::GhostMode mode)
+{
+    for (const Core::GhostSnapshot& ghost : game.snapshot().ghosts)
+    {
+        EXPECT_EQ(ghost.mode, mode) << "ghost " << static_cast<int>(ghost.id);
+    }
+}
+
+// Margin around a wave boundary, so the checks never land exactly on the switch
+constexpr float c_waveMargin{0.25f};
+
 }  // namespace
 
 TEST(GameCoreTest, InitialState)
@@ -263,6 +275,51 @@ TEST(GameVictoryTest, VictoryFreezesGame)
     EXPECT_EQ(game.state(), Core::GameState::Playing);
     EXPECT_EQ(game.snapshot().remainingPellets, c_corridorPellets);
     EXPECT_EQ(game.snapshot().highScore, c_corridorFullScore);
+}
+
+// --- Scatter and Chase waves ---
+
+TEST(GameWaveTest, GhostModeToString)
+{
+    EXPECT_EQ(Core::toString(Core::GhostMode::Scatter), "Scatter");
+    EXPECT_EQ(Core::toString(Core::GhostMode::Chase), "Chase");
+}
+
+TEST(GameWaveTest, SwitchesScatterChaseScatter)
+{
+    // The player stands still, so no pellet is eaten and the game stays in Playing
+    Core::Game game{Tests::makePlayingGame()};
+    expectAllGhostsInMode(game, Core::GhostMode::Scatter);
+
+    game.update(Core::c_scatterDuration - c_waveMargin);
+    expectAllGhostsInMode(game, Core::GhostMode::Scatter);
+
+    game.update(2.0f * c_waveMargin);
+    expectAllGhostsInMode(game, Core::GhostMode::Chase);
+
+    game.update(Core::c_chaseDuration - (2.0f * c_waveMargin));
+    expectAllGhostsInMode(game, Core::GhostMode::Chase);
+
+    game.update(2.0f * c_waveMargin);
+    expectAllGhostsInMode(game, Core::GhostMode::Scatter);
+    EXPECT_EQ(game.state(), Core::GameState::Playing);
+}
+
+TEST(GameWaveTest, ResetRestartsScatterWave)
+{
+    Core::Game game{Tests::makePlayingGame()};
+    game.update(Core::c_scatterDuration + c_waveMargin);
+    expectAllGhostsInMode(game, Core::GhostMode::Chase);
+
+    game.handleCommand(Core::Command::Reset);
+    expectAllGhostsInMode(game, Core::GhostMode::Scatter);
+
+    // The wave timer restarts too: a full Scatter wave passes before Chase
+    game.update(Core::c_scatterDuration - c_waveMargin);
+    expectAllGhostsInMode(game, Core::GhostMode::Scatter);
+
+    game.update(2.0f * c_waveMargin);
+    expectAllGhostsInMode(game, Core::GhostMode::Chase);
 }
 
 TEST(GameVictoryTest, LargeStepEatsEveryPelletOnTheWay)

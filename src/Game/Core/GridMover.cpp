@@ -57,6 +57,10 @@ bool GridMover::stepCell(const Maze& maze, Mover mover, float& distance, Directi
     if (distance < toNextCell)
     {
         m_progress += distance;
+        if (m_progress > 0.0f)
+        {
+            m_entryDirection = Direction::None;
+        }
         distance = 0.0f;
         return false;
     }
@@ -76,6 +80,7 @@ void GridMover::arriveAtNextCell(const Maze& maze)
 {
     const GridPos next{m_tile + directionDelta(m_currentDirection)};
     m_tile = isInside(maze, next) ? next : maze.tunnelExit(m_tile);
+    m_entryDirection = m_currentDirection;
     m_progress = 0.0f;
 }
 
@@ -93,6 +98,7 @@ void GridMover::decideAtCentre(const Maze& maze, Mover mover, Direction& request
         return;
     }
     m_currentDirection = Direction::None;
+    m_entryDirection = Direction::None;
     m_isMoving = false;
     m_progress = 0.0f;
 }
@@ -114,6 +120,43 @@ void GridMover::tryReverse(const Maze& maze, Direction& requested)
     m_currentDirection = requested;
     m_facing = requested;
     requested = Direction::None;
+}
+
+bool GridMover::reverse(const Maze& maze, Mover mover)
+{
+    if (m_progress == 0.0f)
+    {
+        const Direction baseDir{m_entryDirection != Direction::None ? m_entryDirection : m_currentDirection};
+        if (baseDir == Direction::None)
+        {
+            return false;
+        }
+        const Direction reversed{opposite(baseDir)};
+        if (!canEnter(maze, mover, m_tile, reversed))
+        {
+            return false;
+        }
+        m_currentDirection = reversed;
+        m_facing = reversed;
+        m_entryDirection = reversed;
+        return true;
+    }
+    if (m_currentDirection == Direction::None)
+    {
+        return false;
+    }
+    // Beyond the map edge the reversal cannot shift m_tile outside the grid
+    const GridPos next{m_tile + directionDelta(m_currentDirection)};
+    if (!isInside(maze, next))
+    {
+        return false;
+    }
+    const Direction reversed{opposite(m_currentDirection)};
+    m_tile = next;
+    m_progress = 1.0f - m_progress;
+    m_currentDirection = reversed;
+    m_facing = reversed;
+    return true;
 }
 
 }  // namespace LifeExe::Core
