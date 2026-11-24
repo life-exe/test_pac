@@ -16,7 +16,7 @@ struct GhostConfig
     GridPos scatterCorner;
     bool inHouse{false};
     float releaseDelay{0.0f};
-    GridPos homeTile;
+    GridPos homeTile{};
 };
 
 struct GhostUpdateParams
