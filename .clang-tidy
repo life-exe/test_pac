@@ -2,3 +2,6 @@ Checks: '-*,bugprone-*,performance-*,modernize-*,-modernize-use-trailing-return-
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'src[/\\](App|Common|Game)[/\\].*'
 FormatStyle: file
+CheckOptions:
+  - key: readability-function-cognitive-complexity.IgnoreMacros
+    value: true

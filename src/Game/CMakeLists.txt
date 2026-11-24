@@ -18,6 +18,7 @@ add_library(GameCore STATIC
     Core/Ghost.h
     Core/Ghost.cpp
     Core/GhostStrategy.cpp
+    Core/RandomSource.h
 )
 target_include_directories(GameCore PUBLIC Core)
 
@@ -59,6 +60,7 @@ add_executable(GameTests
     Tests/Acceptance/GhostNavigationAcceptanceTest.cpp
     Tests/Acceptance/GhostAiStrategyAcceptanceTest.cpp
     Tests/Acceptance/CollisionsAndLivesAcceptanceTest.cpp
+    Tests/Acceptance/BuffsAndStateMachineAcceptanceTest.cpp
 )
 # Presentation is only an include path: SpriteAtlas.h is header-only and raylib-free, so tests stay off raylib
 target_include_directories(GameTests PRIVATE Tests Presentation)

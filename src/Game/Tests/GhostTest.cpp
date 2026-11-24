@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstddef>
 #include <string_view>
 
@@ -8,7 +9,10 @@
 #include "GameConstants.h"
 #include "GameSnapshot.h"
 #include "Ghost.h"
+#include "GhostStrategy.h"
+#include "Level.h"
 #include "Maze.h"
+#include "RandomSource.h"
 #include "TestHelpers.h"
 #include "Types.h"
 
@@ -99,6 +103,91 @@ void skipReadyPhase(Core::Game& game)
     {
         game.update(Core::c_maxSubstep);
     }
+}
+
+// Always picks the same candidate index, so Frightened choices are reproducible
+class FixedRandomSource final : public Core::IRandomSource
+{
+public:
+    explicit FixedRandomSource(std::size_t index) : m_index{index} {}
+
+    std::size_t nextIndex(std::size_t count) override
+    {
+        m_lastCount = count;
+        return count == 0 ? 0 : m_index % count;
+    }
+
+    std::size_t lastCount() const { return m_lastCount; }
+
+private:
+    std::size_t m_index{0};
+    std::size_t m_lastCount{0};
+};
+
+// Upper bound for the Eaten round trip: 10 seconds of small steps, far more than any path on the classic map
+constexpr int c_maxReturnSteps{640};
+
+Ghost makeEatenGhost(const Maze& maze, GridPos start)
+{
+    Ghost ghost{GhostConfig{.id = GhostId::Ruby,
+                    .spawn = start,
+                    .scatterCorner = maze.scatterCorner(GhostId::Ruby),
+                    .inHouse = false,
+                    .releaseDelay = 0.0f,
+                    .homeTile = maze.ghostSpawn(GhostId::Indigo)},
+        Core::rubyStrategy};
+    ghost.setMode(Core::GhostMode::Eaten, maze, false);
+    return ghost;
+}
+
+// Steps the ghost until it leaves Eaten; -1 means it never got home, which is how a navigation loop shows up
+int stepsUntilRevived(const Maze& maze, Ghost& ghost, const Core::GhostUpdateParams& params)
+{
+    for (int step{0}; step < c_maxReturnSteps; ++step)
+    {
+        ghost.update(maze, c_smallStepDt, params);
+        if (ghost.mode() != Core::GhostMode::Eaten)
+        {
+            return step;
+        }
+    }
+    return -1;
+}
+
+int stepsUntilOutOfHouse(const Maze& maze, Ghost& ghost, const Core::GhostUpdateParams& params)
+{
+    for (int step{0}; step < c_maxReturnSteps; ++step)
+    {
+        if (!ghost.isInHouse())
+        {
+            return step;
+        }
+        ghost.update(maze, c_smallStepDt, params);
+    }
+    return -1;
+}
+
+void expectRevivesFrom(const Maze& maze, GridPos corner)
+{
+    SCOPED_TRACE(testing::Message() << "corner {" << corner.row << ", " << corner.col << "}");
+    Ghost ghost{makeEatenGhost(maze, corner)};
+    FixedRandomSource random{0};
+    const Core::GhostContext context{.playerPos = maze.playerSpawn(),
+        .playerDir = Direction::None,
+        .rubyPos = corner,
+        .ghostPos = corner,
+        .scatterCorner = ghost.scatterCorner()};
+    const Core::GhostUpdateParams params{.context = context, .random = random, .waveMode = Core::GhostMode::Chase};
+
+    ASSERT_GE(stepsUntilRevived(maze, ghost, params), 0);
+    EXPECT_EQ(ghost.mode(), Core::GhostMode::Chase);
+    EXPECT_TRUE(ghost.isInHouse());
+    EXPECT_FLOAT_EQ(ghost.releaseDelay(), 0.0f);
+    EXPECT_EQ(ghost.tile(), maze.ghostSpawn(GhostId::Indigo));
+
+    // The revived ghost leaves by the regular exit route at once
+    EXPECT_GE(stepsUntilOutOfHouse(maze, ghost, params), 0);
+    EXPECT_EQ(ghost.tile(), maze.houseExitTile());
 }
 
 }  // namespace
@@ -300,4 +389,66 @@ TEST(GhostTest, PassesThroughTunnelWithoutReversing)
     EXPECT_TRUE(sawTunnelExit);
     EXPECT_EQ(ghost.tile(), (GridPos{5, 1}));
     EXPECT_EQ(ghost.direction(), Direction::Right);
+}
+
+// --- Frightened and Eaten ---
+
+TEST(GhostTest, ChooseRandomDirectionFollowsPriorityOrder)
+{
+    const Maze maze{makeMaze(c_crossLevel)};
+    const Ghost ghost{makeFreeGhost({3, 4})};
+
+    // A standing ghost has no reverse to exclude, so all four arms are candidates in Up, Left, Down, Right order
+    constexpr std::array<Direction, 4> c_expected{Direction::Up, Direction::Left, Direction::Down, Direction::Right};
+    for (std::size_t index{0}; index < c_expected.size(); ++index)
+    {
+        FixedRandomSource random{index};
+        EXPECT_EQ(ghost.chooseRandomDirection(maze, random), c_expected[index]) << "index " << index;
+        EXPECT_EQ(random.lastCount(), 4U) << "index " << index;
+    }
+}
+
+TEST(GhostTest, ChooseRandomDirectionSkipsReverse)
+{
+    const Maze maze{makeMaze(c_crossLevel)};
+    Ghost ghost{makeFreeGhost({3, 3})};
+    ghost.updateToward(maze, secondsFor(1.5f), {3, 8});
+    ASSERT_EQ(ghost.tile(), (GridPos{3, 4}));
+    ASSERT_EQ(ghost.direction(), Direction::Right);
+
+    // Left would be a reversal, so the candidates are Up, Down, Right
+    FixedRandomSource random{1};
+    EXPECT_EQ(ghost.chooseRandomDirection(maze, random), Direction::Down);
+    EXPECT_EQ(random.lastCount(), 3U);
+}
+
+TEST(GhostTest, ModeSpeedMultipliers)
+{
+    const Maze maze{makeMaze(c_tJunctionLevel)};
+    constexpr float stepDt{0.1f};
+    constexpr float startX{2.5f};
+
+    Ghost normal{makeFreeGhost({1, 2})};
+    normal.updateToward(maze, stepDt, {1, 7});
+    EXPECT_NEAR(normal.position().x - startX, Core::c_ghostSpeed * stepDt, 1e-4f);
+
+    Ghost frightened{makeFreeGhost({1, 2})};
+    frightened.setMode(Core::GhostMode::Frightened, maze, false);
+    frightened.updateToward(maze, stepDt, {1, 7});
+    EXPECT_NEAR(frightened.position().x - startX, Core::c_ghostSpeed * Core::c_frightenedSpeedMultiplier * stepDt, 1e-4f);
+
+    // The house exit of this map lies to the right too, so the Eaten ghost runs along the same corridor
+    Ghost eaten{makeFreeGhost({1, 2})};
+    eaten.setMode(Core::GhostMode::Eaten, maze, false);
+    eaten.updateToward(maze, stepDt, {1, 7});
+    EXPECT_NEAR(eaten.position().x - startX, Core::c_ghostSpeed * Core::c_eatenSpeedMultiplier * stepDt, 1e-4f);
+}
+
+TEST(GhostTest, EatenGhostRevivesFromEveryCorner)
+{
+    const Maze maze{makeMaze(Core::c_classicLevel)};
+    for (const GridPos corner : {GridPos{1, 1}, GridPos{1, 19}, GridPos{19, 1}, GridPos{19, 19}})
+    {
+        expectRevivesFrom(maze, corner);
+    }
 }

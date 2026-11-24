@@ -41,6 +41,7 @@ struct GameSnapshot
     int lives{3};
     RoundPhase roundPhase{RoundPhase::Ready};
     float phaseTimeLeft{0.0f};
+    float frightenedTimer{0.0f};
 };
 
 }  // namespace LifeExe::Core

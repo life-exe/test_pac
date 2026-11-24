@@ -122,22 +122,6 @@ constexpr GridPos directionDelta(Direction direction)
     return {0, 0};
 }
 
-enum class GhostMode : std::uint8_t
-{
-    Scatter = 0,
-    Chase
-};
-
-constexpr std::string_view toString(GhostMode mode)
-{
-    switch (mode)
-    {
-        case GhostMode::Scatter: return "Scatter";
-        case GhostMode::Chase: return "Chase";
-    }
-    return "Unknown";
-}
-
 enum class RoundPhase : std::uint8_t
 {
     Ready = 0,
@@ -152,6 +136,26 @@ constexpr std::string_view toString(RoundPhase phase)
         case RoundPhase::Ready: return "Ready";
         case RoundPhase::Active: return "Active";
         case RoundPhase::PlayerDying: return "PlayerDying";
+    }
+    return "Unknown";
+}
+
+enum class GhostMode : std::uint8_t
+{
+    Scatter = 0,
+    Chase,
+    Frightened,
+    Eaten
+};
+
+constexpr std::string_view toString(GhostMode mode)
+{
+    switch (mode)
+    {
+        case GhostMode::Scatter: return "Scatter";
+        case GhostMode::Chase: return "Chase";
+        case GhostMode::Frightened: return "Frightened";
+        case GhostMode::Eaten: return "Eaten";
     }
     return "Unknown";
 }
