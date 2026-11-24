@@ -83,9 +83,22 @@ const Core::GhostSnapshot& ghostOf(const Core::GameSnapshot& snapshot, GhostId i
     return snapshot.ghosts[static_cast<std::size_t>(id)];
 }
 
-void advanceTo(Core::Game& game, double time)
+// The player is walled off from the ghost house, so long release checks never end in a collision
+constexpr std::string_view c_walledOffLevel{"###########\n"
+                                            "#....1....#\n"
+                                            "#.###=###.#\n"
+                                            "#.# 234 #.#\n"
+                                            "###########\n"
+                                            "T....P....T\n"
+                                            "###########\n"};
+
+// Release timers tick only in RoundPhase::Active, so the Ready pause after Reset is skipped first
+void skipReadyPhase(Core::Game& game)
 {
-    game.update(static_cast<float>(time - game.totalTime()));
+    while (game.state() == Core::GameState::Playing && game.snapshot().roundPhase == Core::RoundPhase::Ready)
+    {
+        game.update(Core::c_maxSubstep);
+    }
 }
 
 }  // namespace
@@ -127,39 +140,40 @@ TEST(GhostTest, LeavesHouseThroughDoorAndClearsInHouse)
 
 TEST(GhostTest, GameReleasesGhostsInTurn)
 {
-    const Maze maze{makeMaze()};
-    Core::Game game{Tests::makePlayingGame()};
+    // Release delays count from the start of RoundPhase::Active, so time advances in relative steps
+    const Maze maze{makeMaze(c_walledOffLevel)};
+    Core::Game game{Tests::makePlayingGame(c_walledOffLevel)};
 
-    advanceTo(game, 0.5);
+    game.update(0.5f);
     Core::GameSnapshot snapshot{game.snapshot()};
     EXPECT_FALSE(isAtCentreOf(ghostOf(snapshot, GhostId::Ruby), maze.ghostSpawn(GhostId::Ruby)));
     EXPECT_TRUE(isAtCentreOf(ghostOf(snapshot, GhostId::Rosie), maze.ghostSpawn(GhostId::Rosie)));
     EXPECT_TRUE(isAtCentreOf(ghostOf(snapshot, GhostId::Indigo), maze.ghostSpawn(GhostId::Indigo)));
     EXPECT_TRUE(isAtCentreOf(ghostOf(snapshot, GhostId::Coral), maze.ghostSpawn(GhostId::Coral)));
 
-    advanceTo(game, Core::c_rosieReleaseDelay - 0.5);
+    game.update(Core::c_rosieReleaseDelay - 1.0f);  // half a second before Rosie's release
     EXPECT_TRUE(isAtCentreOf(ghostOf(game.snapshot(), GhostId::Rosie), maze.ghostSpawn(GhostId::Rosie)));
 
-    advanceTo(game, Core::c_rosieReleaseDelay + 0.5);
+    game.update(1.0f);  // half a second after Rosie's release
     snapshot = game.snapshot();
     EXPECT_FALSE(isAtCentreOf(ghostOf(snapshot, GhostId::Rosie), maze.ghostSpawn(GhostId::Rosie)));
     EXPECT_TRUE(isAtCentreOf(ghostOf(snapshot, GhostId::Indigo), maze.ghostSpawn(GhostId::Indigo)));
     EXPECT_TRUE(isAtCentreOf(ghostOf(snapshot, GhostId::Coral), maze.ghostSpawn(GhostId::Coral)));
 
-    advanceTo(game, Core::c_indigoReleaseDelay + 0.5);
+    game.update(Core::c_indigoReleaseDelay - Core::c_rosieReleaseDelay);  // half a second after Indigo's release
     snapshot = game.snapshot();
     EXPECT_FALSE(isAtCentreOf(ghostOf(snapshot, GhostId::Indigo), maze.ghostSpawn(GhostId::Indigo)));
     EXPECT_TRUE(isAtCentreOf(ghostOf(snapshot, GhostId::Coral), maze.ghostSpawn(GhostId::Coral)));
 
-    advanceTo(game, Core::c_coralReleaseDelay + 0.5);
+    game.update(Core::c_coralReleaseDelay - Core::c_indigoReleaseDelay);  // half a second after Coral's release
     EXPECT_FALSE(isAtCentreOf(ghostOf(game.snapshot(), GhostId::Coral), maze.ghostSpawn(GhostId::Coral)));
 }
 
 TEST(GhostTest, ResetReturnsGhostsToSpawns)
 {
-    const Maze maze{makeMaze()};
-    Core::Game game{Tests::makePlayingGame()};
-    advanceTo(game, Core::c_coralReleaseDelay + 1.0);
+    const Maze maze{makeMaze(c_walledOffLevel)};
+    Core::Game game{Tests::makePlayingGame(c_walledOffLevel)};
+    game.update(Core::c_coralReleaseDelay + 1.0f);
 
     game.handleCommand(Core::Command::Reset);
 
@@ -175,11 +189,12 @@ TEST(GhostTest, ResetReturnsGhostsToSpawns)
 
 TEST(GhostTest, ResetRestartsReleaseTimers)
 {
-    const Maze maze{makeMaze()};
-    Core::Game game{Tests::makePlayingGame()};
-    advanceTo(game, Core::c_coralReleaseDelay + 1.0);
+    const Maze maze{makeMaze(c_walledOffLevel)};
+    Core::Game game{Tests::makePlayingGame(c_walledOffLevel)};
+    game.update(Core::c_coralReleaseDelay + 1.0f);
 
     game.handleCommand(Core::Command::Reset);
+    skipReadyPhase(game);
     game.update(Core::c_rosieReleaseDelay - 0.5f);
 
     // The timers start over, so the house ghosts wait at their spawns again
@@ -188,6 +203,10 @@ TEST(GhostTest, ResetRestartsReleaseTimers)
     {
         EXPECT_TRUE(isAtCentreOf(ghostOf(snapshot, id), maze.ghostSpawn(id)));
     }
+
+    // ...and Rosie still leaves on time, so the check above is not just a frozen round
+    game.update(1.0f);
+    EXPECT_FALSE(isAtCentreOf(ghostOf(game.snapshot(), GhostId::Rosie), maze.ghostSpawn(GhostId::Rosie)));
 }
 
 // --- Navigation ---

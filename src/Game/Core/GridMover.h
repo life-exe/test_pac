@@ -34,6 +34,7 @@ public:
     float progress() const { return m_progress; }
     Vec2f position() const;
     bool reverse(const Maze& maze, Mover mover);
+    GridPos collisionTile() const;
 
 private:
     void decideAtCentre(const Maze& maze, Mover mover, Direction& requested);
@@ -47,5 +48,7 @@ private:
     bool m_isMoving{false};
     float m_progress{0.0f};
 };
+
+bool moversCollide(const GridMover& first, const GridMover& second);
 
 }  // namespace LifeExe::Core

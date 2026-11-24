@@ -138,4 +138,22 @@ constexpr std::string_view toString(GhostMode mode)
     return "Unknown";
 }
 
+enum class RoundPhase : std::uint8_t
+{
+    Ready = 0,
+    Active,
+    PlayerDying
+};
+
+constexpr std::string_view toString(RoundPhase phase)
+{
+    switch (phase)
+    {
+        case RoundPhase::Ready: return "Ready";
+        case RoundPhase::Active: return "Active";
+        case RoundPhase::PlayerDying: return "PlayerDying";
+    }
+    return "Unknown";
+}
+
 }  // namespace LifeExe::Core

@@ -72,6 +72,15 @@ constexpr std::string_view c_tunnelMap{"#########\n"
                                        "#   P   #\n"
                                        "#########\n"};
 
+// Player is walled off from the ghost house so release-timer checks stay independent of collisions
+constexpr std::string_view c_releaseMap{"###########\n"
+                                        "#....1....#\n"
+                                        "#.###=###.#\n"
+                                        "#.# 234 #.#\n"
+                                        "###########\n"
+                                        "T....P....T\n"
+                                        "###########\n"};
+
 }  // namespace
 
 TEST(GhostNavigationAcceptance, GhostConstantsArePositiveAndOrdered)
@@ -97,8 +106,8 @@ TEST(GhostNavigationAcceptance, SnapshotContainsAllFourGhostsAtSpawns)
 
 TEST(GhostNavigationAcceptance, RubyMovesImmediatelyWhileHouseGhostsWaitForReleaseDelays)
 {
-    const Maze maze{Maze::fromAscii(Tests::c_smallLevel).value()};
-    Core::Game game{Tests::makePlayingGame()};
+    const Maze maze{Maze::fromAscii(c_releaseMap).value()};
+    Core::Game game{Tests::makePlayingGame(c_releaseMap)};
 
     game.update(1.0f);
     const Core::GameSnapshot afterOneSec{game.snapshot()};

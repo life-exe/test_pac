@@ -37,6 +37,7 @@ public:
     GhostMode mode() const { return m_mode; }
     bool isInHouse() const { return m_inHouse; }
     float releaseDelay() const { return m_releaseDelay; }
+    const GridMover& mover() const { return m_mover; }
 
 private:
     Mover currentMover() const { return m_inHouse ? Mover::GhostUsingDoor : Mover::Ghost; }

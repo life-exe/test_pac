@@ -2,6 +2,7 @@
 
 #include <raylib.h>
 
+#include "GameConstants.h"
 #include "SpriteAtlas.h"
 
 #include <algorithm>
@@ -144,17 +145,33 @@ float facingAngle(Core::Direction facing)
     return 0.0f;
 }
 
-void drawPlayer(const Core::PlayerSnapshot& player, const MazeLayout& layout, const Texture2D& spritesheet)
+// The collapse lasts exactly the PlayerDying phase, so its frame follows the phase progress rather than animTime
+int deathFrameIndex(float phaseTimeLeft)
 {
-    // animTime freezes while the player stands, so the mouth stops on the current frame
-    constexpr float chomperFps{12.0f};
-    const int frame{static_cast<int>(player.animTime * chomperFps)};
+    constexpr float deathFrames{4.0f};
+    const float progress{1.0f - (phaseTimeLeft / Core::c_dyingDuration)};
+    return static_cast<int>(progress * deathFrames);
+}
 
+void drawPlayer(const Core::GameSnapshot& snapshot, const MazeLayout& layout, const Texture2D& spritesheet)
+{
+    const Core::PlayerSnapshot& player{snapshot.player};
     const auto size{static_cast<float>(layout.tileSize)};
     const Rectangle dest{static_cast<float>(layout.originX) + (player.position.x * size),
         static_cast<float>(layout.originY) + (player.position.y * size), size, size};
     // Rotating around the tile centre keeps the sprite on the player's position for every facing
     const Vector2 origin{size * 0.5f, size * 0.5f};
+
+    if (snapshot.roundPhase == Core::RoundPhase::PlayerDying)
+    {
+        // The collapse does not depend on the facing, so the death frames are drawn upright
+        DrawTexturePro(spritesheet, toRectangle(playerDeathFrame(deathFrameIndex(snapshot.phaseTimeLeft))), dest, origin, 0.0f, WHITE);
+        return;
+    }
+
+    // animTime freezes while the player stands, so the mouth stops on the current frame
+    constexpr float chomperFps{12.0f};
+    const int frame{static_cast<int>(player.animTime * chomperFps)};
     DrawTexturePro(spritesheet, toRectangle(playerMoveFrame(frame)), dest, origin, facingAngle(player.facing), WHITE);
 }
 
@@ -186,6 +203,26 @@ void drawGhost(const Core::GhostSnapshot& ghost, const MazeLayout& layout, doubl
     DrawTexturePro(spritesheet, toRectangle(ghostEyesFrame(ghost.direction)), dest, origin, 0.0f, WHITE);
 }
 
+// In Ready every ghost stands on its spawn, so the lowest ghost marks the house floor:
+// the text goes two rows below it, on the row right under the house wall
+void drawReadyText(const Core::GameSnapshot& snapshot, const MazeLayout& layout)
+{
+    constexpr const char* text{"READY!"};
+    float lowestGhostY{0.0f};
+    for (const Core::GhostSnapshot& ghost : snapshot.ghosts)
+    {
+        lowestGhostY = std::max(lowestGhostY, ghost.position.y);
+    }
+    // A house at the very bottom of a map would push the text off the maze
+    const float rowCentreY{std::min(lowestGhostY + 2.0f, static_cast<float>(snapshot.mazeRows) - 0.5f)};
+
+    const int fontSize{std::max(10, layout.tileSize)};
+    const int textWidth{MeasureText(text, fontSize)};
+    const int x{layout.originX + (((snapshot.mazeCols * layout.tileSize) - textWidth) / 2)};
+    const int y{layout.originY + static_cast<int>(rowCentreY * static_cast<float>(layout.tileSize)) - (fontSize / 2)};
+    DrawText(text, x, y, fontSize, YELLOW);
+}
+
 void drawTextRightAligned(const std::string& text, int rightX, int y, int fontSize, Color color)
 {
     DrawText(text.c_str(), rightX - MeasureText(text.c_str(), fontSize), y, fontSize, color);
@@ -208,8 +245,24 @@ void drawTopHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
     drawTextRightAligned(stateText, screen.width - sidePadding, textY, c_hudFontSize, LIGHTGRAY);
 }
 
-// Bottom band: progress and diagnostics on the first line, controls on the second
-void drawBottomHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
+// Icons at the atlas' own size stay pixel-crisp and match the 16px HUD font line;
+// the row is anchored by its top centre, so a point is passed instead of loose coordinates that could be swapped
+void drawLives(int lives, Vector2 topCentre, const Texture2D& spritesheet)
+{
+    constexpr auto iconSize{static_cast<float>(c_tileSize)};
+    constexpr float iconGap{4.0f};
+    const int count{std::max(0, lives)};
+    const float rowWidth{(static_cast<float>(count) * (iconSize + iconGap)) - iconGap};
+    const float startX{topCentre.x - (rowWidth / 2.0f)};
+    for (int index{0}; index < count; ++index)
+    {
+        const Rectangle dest{startX + (static_cast<float>(index) * (iconSize + iconGap)), topCentre.y, iconSize, iconSize};
+        DrawTexturePro(spritesheet, toRectangle(lifeIconSprite()), dest, {0.0f, 0.0f}, 0.0f, WHITE);
+    }
+}
+
+// Bottom band: pellets, lives and diagnostics on the first line, controls on the second
+void drawBottomHud(const Core::GameSnapshot& snapshot, ScreenSize screen, const Texture2D& spritesheet)
 {
     constexpr int sidePadding{10};
     constexpr int fontSize{16};
@@ -221,28 +274,31 @@ void drawBottomHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
     const std::string pelletsText{std::format("PELLETS: {}", snapshot.remainingPellets)};
     DrawText(pelletsText.c_str(), sidePadding, firstLineY, fontSize, WHITE);
 
+    // Integer centre keeps the icons on whole pixels, so point filtering does not smear them
+    const int livesCentreX{screen.width / 2};
+    drawLives(snapshot.lives, {static_cast<float>(livesCentreX), static_cast<float>(firstLineY)}, spritesheet);
+
     const std::string diagnosticsText{std::format("FPS: {}  Time: {:.2f}s", GetFPS(), snapshot.totalTime)};
     drawTextRightAligned(diagnosticsText, screen.width - sidePadding, firstLineY, fontSize, LIGHTGRAY);
 
     DrawText("Controls: [WASD/Arrows] Move | [P] Pause/Resume | [R] Reset | [ESC] Quit", sidePadding, secondLineY, fontSize, GRAY);
 }
 
-void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen)
+void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen, const Texture2D& spritesheet)
 {
     drawTopHud(snapshot, screen);
-    drawBottomHud(snapshot, screen);
+    drawBottomHud(snapshot, screen, spritesheet);
 }
 
-// Victory covers the whole screen: the round is over, and the dimmed maze shows what was cleared
-void drawVictoryOverlay(ScreenSize screen)
+// Victory and Game Over cover the whole screen: the round is over, and the dimmed maze shows how it ended
+void drawEndOverlay(ScreenSize screen, const char* title, Color titleColor)
 {
     DrawRectangle(0, 0, screen.width, screen.height, Fade(BLACK, 0.6f));
 
-    constexpr const char* title{"VICTORY!"};
     constexpr int titleFontSize{48};
     const int titleWidth{MeasureText(title, titleFontSize)};
     const int titleY{(screen.height / 2) - titleFontSize};
-    DrawText(title, (screen.width - titleWidth) / 2, titleY, titleFontSize, GOLD);
+    DrawText(title, (screen.width - titleWidth) / 2, titleY, titleFontSize, titleColor);
 
     constexpr const char* hint{"PRESS [R] TO RESTART"};
     constexpr int hintFontSize{24};
@@ -250,31 +306,27 @@ void drawVictoryOverlay(ScreenSize screen)
     DrawText(hint, (screen.width - hintWidth) / 2, titleY + titleFontSize + 16, hintFontSize, RAYWHITE);
 }
 
-void drawStateOverlay(Core::GameState state, ScreenSize screen)
+void drawPauseOverlay(ScreenSize screen)
 {
-    const char* text{nullptr};
-    Color color{WHITE};
-    switch (state)
-    {
-        case Core::GameState::Playing: return;
-        case Core::GameState::Paused:
-            text = "PAUSED - PRESS [P] TO RESUME";
-            color = ORANGE;
-            break;
-        case Core::GameState::GameOver:
-            text = "GAME OVER";
-            color = RED;
-            break;
-        case Core::GameState::Victory: drawVictoryOverlay(screen); return;
-    }
-
+    constexpr const char* text{"PAUSED - PRESS [P] TO RESUME"};
     constexpr int fontSize{30};
     const int textWidth{MeasureText(text, fontSize)};
     const int x{(screen.width - textWidth) / 2};
     const int y{(screen.height - fontSize) / 2};
     // Dim backdrop keeps the message readable on top of the walls
     DrawRectangle(x - 16, y - 12, textWidth + 32, fontSize + 24, Fade(BLACK, 0.8f));
-    DrawText(text, x, y, fontSize, color);
+    DrawText(text, x, y, fontSize, ORANGE);
+}
+
+void drawStateOverlay(Core::GameState state, ScreenSize screen)
+{
+    switch (state)
+    {
+        case Core::GameState::Playing: return;
+        case Core::GameState::Paused: drawPauseOverlay(screen); return;
+        case Core::GameState::GameOver: drawEndOverlay(screen, "GAME OVER", RED); return;
+        case Core::GameState::Victory: drawEndOverlay(screen, "VICTORY!", GOLD); return;
+    }
 }
 
 }  // namespace
@@ -338,13 +390,21 @@ void RaylibRenderer::render(const Core::GameSnapshot& snapshot) const
     {
         const MazeLayout layout{computeLayout(snapshot, screen)};
         drawMaze(snapshot, layout, m_spritesheet);
-        drawPlayer(snapshot.player, layout, m_spritesheet);
-        for (const Core::GhostSnapshot& ghost : snapshot.ghosts)
+        drawPlayer(snapshot, layout, m_spritesheet);
+        // Ghosts vanish while the player collapses, so the death animation is the only thing moving on the field
+        if (snapshot.roundPhase != Core::RoundPhase::PlayerDying)
         {
-            drawGhost(ghost, layout, snapshot.totalTime, m_spritesheet);
+            for (const Core::GhostSnapshot& ghost : snapshot.ghosts)
+            {
+                drawGhost(ghost, layout, snapshot.totalTime, m_spritesheet);
+            }
+        }
+        if (snapshot.state == Core::GameState::Playing && snapshot.roundPhase == Core::RoundPhase::Ready)
+        {
+            drawReadyText(snapshot, layout);
         }
     }
-    drawHud(snapshot, screen);
+    drawHud(snapshot, screen, m_spritesheet);
     drawStateOverlay(snapshot.state, screen);
 
     EndDrawing();

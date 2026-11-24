@@ -38,6 +38,9 @@ struct GameSnapshot
     int score{0};
     int highScore{0};
     int remainingPellets{0};
+    int lives{3};
+    RoundPhase roundPhase{RoundPhase::Ready};
+    float phaseTimeLeft{0.0f};
 };
 
 }  // namespace LifeExe::Core

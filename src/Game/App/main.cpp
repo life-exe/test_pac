@@ -32,7 +32,8 @@ int main()
         constexpr float maxFrameTime{0.25f};
         float accumulator{0.0f};
 
-        while (!renderer.shouldClose() && game.state() != Core::GameState::GameOver)
+        // GameOver must not end the loop: the GAME OVER screen stays up until [R] restarts or the window closes
+        while (!renderer.shouldClose())
         {
             // 1. Translate platform input into core commands
             for (const Core::Command command : renderer.processInput())

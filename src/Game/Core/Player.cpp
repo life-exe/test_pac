@@ -1,5 +1,7 @@
 #include "Player.h"
 
+#include <cmath>
+
 #include "GameConstants.h"
 
 namespace LifeExe::Core
@@ -14,6 +16,12 @@ void Player::update(const Maze& maze, float dt)
     {
         m_animTime += dt;
     }
+}
+
+GridPos Player::tile() const
+{
+    const Vec2f pos{m_mover.position()};
+    return {static_cast<int>(std::floor(pos.y)), static_cast<int>(std::floor(pos.x))};
 }
 
 }  // namespace LifeExe::Core
