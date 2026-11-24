@@ -87,7 +87,8 @@ TEST(GhostAiStrategyAcceptance, RubyStrategyTargetsPlayerDirectly)
 TEST(GhostAiStrategyAcceptance, RosieStrategyTargetsFourTilesAheadWithoutLegacyOverflow)
 {
     const GhostStrategy strategy{rosieStrategy};
-    const GhostContext base{.playerPos = {10, 10}, .rubyPos = {1, 1}, .ghostPos = {2, 2}, .scatterCorner = {-3, 2}};
+    const GhostContext base{
+        .playerPos = {10, 10}, .playerDir = Direction::None, .rubyPos = {1, 1}, .ghostPos = {2, 2}, .scatterCorner = {-3, 2}};
 
     auto withDir = [&](Direction dir)
     {
@@ -211,7 +212,8 @@ TEST(GhostAiStrategyAcceptance, ModeChangeDoesNotReverseGhostInsideHouse)
 TEST(GhostAiStrategyAcceptance, GhostFollowsScatterCornerInScatterAndStrategyInChase)
 {
     const Maze maze{Maze::fromAscii(c_junctionMap).value()};
-    const GhostContext context{.playerPos = {3, 1}, .playerDir = Direction::None, .rubyPos = {1, 1}, .ghostPos = {1, 3}};
+    const GhostContext context{
+        .playerPos = {3, 1}, .playerDir = Direction::None, .rubyPos = {1, 1}, .ghostPos = {1, 3}, .scatterCorner = {1, 10}};
     const auto fixedTarget = [](const GhostContext& /*context*/) { return GridPos{6, 3}; };
 
     // In Scatter, scatterCorner (1, 10) pulls the ghost Right past junction (1,
@@ -221,7 +223,8 @@ TEST(GhostAiStrategyAcceptance, GhostFollowsScatterCornerInScatterAndStrategyInC
     scatterGhost.update(maze, ghostSecondsFor(2.0f), context);
     EXPECT_EQ(scatterGhost.tile(), (GridPos{1, 4}));
 
-    // In Chase, fixedTarget targets (6, 3) and pulls the ghost Down at junction (1, 3)
+    // In Chase, fixedTarget targets (6, 3) and pulls the ghost Down at junction
+    // (1, 3)
     Ghost chaseGhost{{.id = GhostId::Ruby, .spawn = {1, 2}, .scatterCorner = {1, 10}, .inHouse = false, .releaseDelay = 0.0f}, fixedTarget};
     chaseGhost.setMode(GhostMode::Chase, maze);
     chaseGhost.update(maze, ghostSecondsFor(2.0f), context);
@@ -231,18 +234,21 @@ TEST(GhostAiStrategyAcceptance, GhostFollowsScatterCornerInScatterAndStrategyInC
 TEST(GhostAiStrategyAcceptance, ModeChangeAtJunctionCentreReverses180DegreesFromEntryDirection)
 {
     const Maze maze{Maze::fromAscii(c_junctionMap).value()};
-    const GhostContext context{.playerPos = {1, 7}, .playerDir = Direction::None, .rubyPos = {1, 3}, .ghostPos = {1, 3}};
+    const GhostContext context{
+        .playerPos = {1, 7}, .playerDir = Direction::None, .rubyPos = {1, 3}, .ghostPos = {1, 3}, .scatterCorner = {1, 7}};
     const auto pullRight = [](const GhostContext& /*ctx*/) { return GridPos{1, 7}; };
 
-    // Start in the vertical branch (2, 3) and arrive at T-junction centre (1, 3) moving Up.
-    // At the exact cell centre decideAtCentre already picks Right toward scatterCorner (1, 7).
+    // Start in the vertical branch (2, 3) and arrive at T-junction centre (1, 3)
+    // moving Up. At the exact cell centre decideAtCentre already picks Right
+    // toward scatterCorner (1, 7).
     Ghost ruby{{.id = GhostId::Ruby, .spawn = {2, 3}, .scatterCorner = {1, 7}, .inHouse = false, .releaseDelay = 0.0f}, pullRight};
     ruby.update(maze, ghostSecondsFor(1.0f), context);
     ASSERT_EQ(ruby.tile(), (GridPos{1, 3}));
     ASSERT_EQ(ruby.direction(), Direction::Right);
 
-    // Reversal must invert the entry heading (Up -> Down), not the pre-selected turn (Right -> Left),
-    // and the next step must actually move Down instead of snapping back Right toward the Chase target.
+    // Reversal must invert the entry heading (Up -> Down), not the pre-selected
+    // turn (Right -> Left), and the next step must actually move Down instead of
+    // snapping back Right toward the Chase target.
     ruby.setMode(GhostMode::Chase, maze);
     EXPECT_EQ(ruby.direction(), Direction::Down);
 
