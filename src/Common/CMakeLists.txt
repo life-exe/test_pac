@@ -4,7 +4,9 @@ project(Common LANGUAGES CXX)
 # 1. Статическая библиотека конфигурации                                                                                                                 
 add_library(Common STATIC                                                                                                                                
         Config.cpp                                                                                                                                           
-        Config.h                                                                                                                                             
+        Config.h
+        HighScoreStorage.cpp
+        HighScoreStorage.h                                                                                                                                             
 )                                                                                                                                                        
                                                                                                                                                              
 # Делаем текущую папку доступной для include всем, кто линкует Common                                                                                    
@@ -17,7 +19,7 @@ set_project_warnings(Common)
 enable_sanitizers(Common)                                                                                                                                
                                                                                                                                                              
 # 2. Модульные тесты модуля Common                                                                                                                       
-add_executable(CommonTests Tests/ConfigTest.cpp)                                                                                                         
+add_executable(CommonTests Tests/ConfigTest.cpp Tests/HighScoreStorageTest.cpp)                                                                                                         
 target_link_libraries(CommonTests PRIVATE Common GTest::gtest_main)                                                                                      
 set_target_properties(CommonTests PROPERTIES FOLDER Common)                                                                                              
 set_project_warnings(CommonTests)                                                                                                                        

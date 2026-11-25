@@ -22,8 +22,25 @@ Direction toDirection(Command command)
         case Command::MoveDown: return Direction::Down;
         case Command::MoveLeft: return Direction::Left;
         case Command::MoveRight: return Direction::Right;
-        default: return Direction::None;
+        case Command::Pause:
+        case Command::Resume:
+        case Command::TogglePause:
+        case Command::Reset:
+        case Command::Quit:
+        case Command::Confirm:
+        case Command::None: return Direction::None;
     }
+    return Direction::None;
+}
+
+bool canResetFrom(GameState state)
+{
+    return state == GameState::Playing || state == GameState::Paused || state == GameState::Victory || state == GameState::GameOver;
+}
+
+bool canConfirmNewGame(GameState state)
+{
+    return state == GameState::MainMenu || state == GameState::Victory || state == GameState::GameOver;
 }
 
 }  // namespace
@@ -127,9 +144,30 @@ void Game::handleCommand(Command command)
             }
             break;
 
-        case Command::Reset: reset(); break;
+        case Command::Reset:
+            if (canResetFrom(m_state))
+            {
+                reset();
+            }
+            break;
 
-        case Command::Quit: m_state = GameState::GameOver; break;
+        case Command::Confirm:
+            if (canConfirmNewGame(m_state))
+            {
+                reset();
+            }
+            break;
+
+        case Command::Quit:
+            if (m_state == GameState::MainMenu)
+            {
+                m_state = GameState::Exit;
+            }
+            else if (m_state != GameState::Exit)
+            {
+                m_state = GameState::MainMenu;
+            }
+            break;
 
         case Command::MoveUp:
         case Command::MoveDown:

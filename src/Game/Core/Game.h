@@ -47,7 +47,7 @@ private:
     Player m_player;
     // Declared after m_maze: the ghosts are built from its spawns and corners
     std::array<Ghost, 4> m_ghosts;  // indexed by GhostId
-    GameState m_state{GameState::Playing};
+    GameState m_state{GameState::MainMenu};
     double m_totalTime{0.0};
     int m_score{0};
     int m_highScore{0};

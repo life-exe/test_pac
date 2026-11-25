@@ -17,7 +17,8 @@ enum class Command : std::uint8_t
     MoveUp,
     MoveDown,
     MoveLeft,
-    MoveRight
+    MoveRight,
+    Confirm
 };
 
 constexpr std::string_view toString(Command command)
@@ -34,6 +35,7 @@ constexpr std::string_view toString(Command command)
         case Command::MoveDown: return "MoveDown";
         case Command::MoveLeft: return "MoveLeft";
         case Command::MoveRight: return "MoveRight";
+        case Command::Confirm: return "Confirm";
     }
     return "Unknown";
 }
