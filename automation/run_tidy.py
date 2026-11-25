@@ -34,6 +34,9 @@ if IS_WINDOWS:
         "/p:RunCodeAnalysis=true",
         "/p:EnableClangTidyCodeAnalysis=true",
         "/p:EnableMicrosoftCodeAnalysis=false",
+        # MSBuild defaults ClangTidyChecks to clang-analyzer-* and appends it on top of .clang-tidy,
+        # adding slow symbolic-execution checks absent on Linux; disable it to match .clang-tidy.
+        "/p:ClangTidyChecks=-clang-analyzer-*",
         f"/p:MaxNumberOfProcesses={jobs}",
     ]
     # MSVC 19.52+ gets /std:c++23 from CMake, which older bundled clang-tidy drops
