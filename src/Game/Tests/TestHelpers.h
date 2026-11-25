@@ -34,7 +34,8 @@ inline Core::Game makeReadyGame(std::string_view asciiMap = c_smallLevel)
     return game;
 }
 
-// Creates a game on the given map with a custom random source, confirms past MainMenu and advances through Ready to Active.
+// Creates a game on the given map with a custom random source, confirms past MainMenu,
+// advances through Ready to Active and drains the RoundStarted event so tests start with an empty queue.
 inline Core::Game makePlayingGame(std::string_view asciiMap, std::unique_ptr<Core::IRandomSource> random)
 {
     Core::Game game{Core::Maze::fromAscii(asciiMap).value(), std::move(random)};
@@ -43,16 +44,17 @@ inline Core::Game makePlayingGame(std::string_view asciiMap, std::unique_ptr<Cor
     {
         game.update(Core::c_maxSubstep);
     }
+    (void)game.takeEvents();
     return game;
 }
 
-// Creates a game on c_smallLevel with a custom random source and advances through Ready to Active.
+// Creates a game on c_smallLevel with a custom random source and returns it Active with an empty event queue.
 inline Core::Game makePlayingGame(std::unique_ptr<Core::IRandomSource> random)
 {
     return makePlayingGame(c_smallLevel, std::move(random));
 }
 
-// Creates a game on the given map and advances through Ready to RoundPhase::Active.
+// Creates a game on the given map and returns it Active with an empty event queue.
 inline Core::Game makePlayingGame(std::string_view asciiMap = c_smallLevel)
 {
     return makePlayingGame(asciiMap, std::make_unique<Core::DefaultRandomSource>());

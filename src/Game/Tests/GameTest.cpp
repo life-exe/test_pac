@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <format>
@@ -7,15 +8,28 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "Game.h"
 #include "GameConstants.h"
+#include "GameEvents.h"
 #include "Maze.h"
 #include "RandomSource.h"
 #include "TestHelpers.h"
 #include "Types.h"
 
 using namespace LifeExe;
+
+namespace LifeExe::Core
+{
+
+// gtest prints unknown enums as raw bytes; found by ADL, this makes a failed event queue comparison readable
+void PrintTo(GameEvent event, std::ostream* out)
+{
+    *out << toString(event);
+}
+
+}  // namespace LifeExe::Core
 
 namespace
 {
@@ -1045,3 +1059,138 @@ TEST_P(GameIgnoredCommandTest, CommandChangesNothing)
 }
 
 INSTANTIATE_TEST_SUITE_P(ScreenTable, GameIgnoredCommandTest, testing::ValuesIn(c_ignoredCommandCases), ignoredCaseName);
+
+// --- Domain events: the queue the presentation drains once per frame ---
+
+namespace
+{
+
+using Events = std::vector<Core::GameEvent>;
+
+// On c_collisionLevel the number of pellets eaten before the collision depends on timing, so a round there is
+// checked by its edges: it starts with RoundStarted and ends with the one and only PlayerLostLife, and no GameOver yet
+void expectRoundEndsWithLostLife(const Events& events)
+{
+    ASSERT_FALSE(events.empty());
+    EXPECT_EQ(events.front(), Core::GameEvent::RoundStarted);
+    EXPECT_EQ(events.back(), Core::GameEvent::PlayerLostLife);
+    EXPECT_EQ(std::ranges::count(events, Core::GameEvent::PlayerLostLife), 1);
+    EXPECT_EQ(std::ranges::count(events, Core::GameEvent::GameOver), 0);
+}
+
+}  // namespace
+
+TEST(GameEventTest, GameEventToString)
+{
+    EXPECT_EQ(Core::toString(Core::GameEvent::PelletEaten), "PelletEaten");
+    EXPECT_EQ(Core::toString(Core::GameEvent::PowerPelletEaten), "PowerPelletEaten");
+    EXPECT_EQ(Core::toString(Core::GameEvent::GhostEaten), "GhostEaten");
+    EXPECT_EQ(Core::toString(Core::GameEvent::PlayerLostLife), "PlayerLostLife");
+    EXPECT_EQ(Core::toString(Core::GameEvent::RoundStarted), "RoundStarted");
+    EXPECT_EQ(Core::toString(Core::GameEvent::Victory), "Victory");
+    EXPECT_EQ(Core::toString(Core::GameEvent::GameOver), "GameOver");
+}
+
+TEST(GameEventTest, RoundStartedOnReadyToActiveAndTakeClearsQueue)
+{
+    Core::Game game{Tests::makeReadyGame()};
+    // Confirm went through reset(), so the Ready pause starts with an empty queue
+    EXPECT_TRUE(game.takeEvents().empty());
+
+    skipReadyPhase(game);
+    ASSERT_EQ(game.snapshot().roundPhase, Core::RoundPhase::Active);
+    EXPECT_EQ(game.takeEvents(), (Events{Core::GameEvent::RoundStarted}));
+    EXPECT_TRUE(game.takeEvents().empty());
+}
+
+// The main loop runs several fixed steps per frame and drains once, so nothing may be lost between updates
+TEST(GameEventTest, EventsOfConsecutiveUpdatesAccumulate)
+{
+    Core::Game game{makeCorridorGame()};
+    game.update(secondsFor(1.0f));
+    game.update(secondsFor(1.0f));
+
+    EXPECT_EQ(game.takeEvents(), (Events{Core::GameEvent::PelletEaten, Core::GameEvent::PelletEaten}));
+}
+
+TEST(GameEventTest, PelletEaten)
+{
+    Core::Game game{makeCorridorGame()};
+    game.update(secondsFor(1.0f));
+
+    EXPECT_EQ(game.takeEvents(), (Events{Core::GameEvent::PelletEaten}));
+}
+
+TEST(GameEventTest, PowerPelletEaten)
+{
+    Core::Game game{makeFixedRandomGame(c_frightenedRingLevel)};
+    game.handleCommand(Core::Command::MoveRight);
+    Core::GameSnapshot before{};
+    ASSERT_TRUE(stepUntil(game, isFrightenedActive, before));
+
+    EXPECT_EQ(game.takeEvents(), (Events{Core::GameEvent::PowerPelletEaten}));
+}
+
+TEST(GameEventTest, VictoryAfterLastPellet)
+{
+    Core::Game game{makeCorridorGame()};
+    game.update(secondsFor(3.0f));
+    ASSERT_EQ(game.state(), Core::GameState::Victory);
+
+    EXPECT_EQ(game.takeEvents(),
+        (Events{Core::GameEvent::PelletEaten, Core::GameEvent::PelletEaten, Core::GameEvent::PowerPelletEaten, Core::GameEvent::Victory}));
+}
+
+TEST(GameEventTest, GhostEaten)
+{
+    Core::Game game{makeFixedRandomGame(c_eatGhostLevel)};
+    Core::GameSnapshot before{};
+    ASSERT_TRUE(stepUntil(
+        game, [](const Core::GameSnapshot& snapshot) { return ghostOf(snapshot, Core::GhostId::Ruby).position.x < 5.0f; }, before));
+    game.handleCommand(Core::Command::MoveRight);
+    ASSERT_TRUE(stepUntil(game, isRubyEaten, before));
+
+    EXPECT_EQ(game.takeEvents(), (Events{Core::GameEvent::PowerPelletEaten, Core::GameEvent::GhostEaten}));
+}
+
+TEST(GameEventTest, PlayerLostLifeImmediatelyOnCollision)
+{
+    Core::Game game{Tests::makeReadyGame(c_collisionLevel)};
+    ASSERT_TRUE(runIntoGhost(game));
+    ASSERT_EQ(game.snapshot().roundPhase, Core::RoundPhase::PlayerDying);
+
+    // runIntoGhost stops on the collision substep: the death sound must not wait for the dying pause
+    expectRoundEndsWithLostLife(game.takeEvents());
+
+    game.update(0.5f);
+    EXPECT_EQ(game.snapshot().roundPhase, Core::RoundPhase::PlayerDying);
+    EXPECT_TRUE(game.takeEvents().empty());
+}
+
+TEST(GameEventTest, GameOverAfterDyingTimer)
+{
+    Core::Game game{Tests::makeReadyGame(c_collisionLevel)};
+    ASSERT_TRUE(loseLife(game));
+    ASSERT_TRUE(loseLife(game));
+    (void)game.takeEvents();
+
+    // The last collision is reported at once, but GameOver waits for the dying pause
+    ASSERT_TRUE(runIntoGhost(game));
+    ASSERT_EQ(game.snapshot().lives, 0);
+    expectRoundEndsWithLostLife(game.takeEvents());
+
+    ASSERT_TRUE(runWhilePhase(game, Core::RoundPhase::PlayerDying));
+    ASSERT_EQ(game.state(), Core::GameState::GameOver);
+    EXPECT_EQ(game.takeEvents(), (Events{Core::GameEvent::GameOver}));
+}
+
+// Sounds of an abandoned game must not leak into the new one
+TEST(GameEventTest, ResetClearsUntakenEvents)
+{
+    Core::Game game{makeCorridorGame()};
+    game.update(secondsFor(1.0f));
+    ASSERT_EQ(game.snapshot().score, Core::c_pelletScore);
+
+    game.handleCommand(Core::Command::Reset);
+    EXPECT_TRUE(game.takeEvents().empty());
+}

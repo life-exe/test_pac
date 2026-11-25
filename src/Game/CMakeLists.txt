@@ -19,6 +19,7 @@ add_library(GameCore STATIC
     Core/Ghost.cpp
     Core/GhostStrategy.cpp
     Core/RandomSource.h
+    Core/GameEvents.h
 )
 target_include_directories(GameCore PUBLIC Core)
 
@@ -29,6 +30,8 @@ add_library(GamePresentation STATIC
     Presentation/RaylibRenderer.h
     Presentation/RaylibRenderer.cpp
     Presentation/SpriteAtlas.h
+    Presentation/SoundSystem.h
+    Presentation/SoundSystem.cpp
 )
 target_include_directories(GamePresentation PUBLIC Presentation)
 # raylib is PUBLIC: RaylibRenderer.h holds a Texture2D, so its users need raylib headers too
@@ -62,6 +65,7 @@ add_executable(GameTests
     Tests/Acceptance/CollisionsAndLivesAcceptanceTest.cpp
     Tests/Acceptance/BuffsAndStateMachineAcceptanceTest.cpp
     Tests/Acceptance/GameScreensAndMenuAcceptanceTest.cpp
+    Tests/Acceptance/DomainEventsAcceptanceTest.cpp
 )
 # Presentation is only an include path: SpriteAtlas.h is header-only and raylib-free, so tests stay off raylib
 target_include_directories(GameTests PRIVATE Tests Presentation)

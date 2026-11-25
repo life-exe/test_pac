@@ -190,6 +190,7 @@ void Game::reset()
     m_score = 0;
     m_lives = c_startingLives;
     m_maze = m_initialMaze;
+    m_events.clear();
     respawnRound();
 }
 
@@ -315,10 +316,12 @@ void Game::consumePelletAtPlayer()
     if (eaten == TileType::Pellet)
     {
         m_score += c_pelletScore;
+        m_events.push_back(GameEvent::PelletEaten);
     }
     else if (eaten == TileType::PowerPellet)
     {
         m_score += c_powerPelletScore;
+        m_events.push_back(GameEvent::PowerPelletEaten);
         activateFrightened();
     }
     m_highScore = std::max(m_highScore, m_score);
@@ -326,6 +329,7 @@ void Game::consumePelletAtPlayer()
     if (m_maze.remainingPellets() == 0)
     {
         m_state = GameState::Victory;
+        m_events.push_back(GameEvent::Victory);
     }
 }
 
@@ -341,6 +345,7 @@ void Game::advancePhaseTimer(float stepDt)
     if (m_roundPhase == RoundPhase::Ready)
     {
         m_roundPhase = RoundPhase::Active;
+        m_events.push_back(GameEvent::RoundStarted);
         return;
     }
 
@@ -351,6 +356,7 @@ void Game::advancePhaseTimer(float stepDt)
     else
     {
         m_state = GameState::GameOver;
+        m_events.push_back(GameEvent::GameOver);
     }
 }
 
@@ -370,12 +376,14 @@ void Game::checkGhostCollisions()
             m_score += c_baseGhostEatScore * (1 << shift);
             m_highScore = std::max(m_highScore, m_score);
             ++m_eatenGhostCombo;
+            m_events.push_back(GameEvent::GhostEaten);
             continue;
         }
 
         --m_lives;
         m_roundPhase = RoundPhase::PlayerDying;
         m_phaseTimer = c_dyingDuration;
+        m_events.push_back(GameEvent::PlayerLostLife);
         return;
     }
 }
@@ -422,6 +430,13 @@ void Game::updateFrightenedTimer(float stepDt)
             ghost.setMode(m_waveMode, m_maze, false);
         }
     }
+}
+
+std::vector<GameEvent> Game::takeEvents()
+{
+    std::vector<GameEvent> events;
+    events.swap(m_events);
+    return events;
 }
 
 }  // namespace LifeExe::Core
