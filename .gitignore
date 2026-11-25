@@ -5,3 +5,4 @@ __pycache__/
 LastCoverageResults.log
 build-asan/
 docs/api/
+highscore.json

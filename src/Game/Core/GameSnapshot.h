@@ -28,7 +28,7 @@ struct GhostSnapshot
 // Read-only frame snapshot; tiles views core memory until the next update, handleCommand or reset.
 struct GameSnapshot
 {
-    GameState state{GameState::Playing};
+    GameState state{GameState::MainMenu};
     double totalTime{0.0};
     int mazeRows{0};
     int mazeCols{0};

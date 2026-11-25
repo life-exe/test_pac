@@ -194,7 +194,8 @@ TEST(PlayerTest, MoveCommandsIgnoredWhilePaused)
     EXPECT_EQ(game.snapshot().player.direction, Core::Direction::None);
 }
 
-TEST(PlayerTest, MoveCommandsIgnoredAfterGameOver)
+// Quit leaves the round for the main menu, where movement input must not reach the player
+TEST(PlayerTest, MoveCommandsIgnoredAfterQuit)
 {
     Core::Game game{Tests::makePlayingGame()};
     game.handleCommand(Core::Command::Quit);
@@ -202,7 +203,7 @@ TEST(PlayerTest, MoveCommandsIgnoredAfterGameOver)
     game.update(4.0f * c_oneTileDt);
 
     const Core::PlayerSnapshot player{game.snapshot().player};
-    EXPECT_EQ(game.snapshot().state, Core::GameState::GameOver);
+    EXPECT_EQ(game.snapshot().state, Core::GameState::MainMenu);
     expectPosition(game, c_spawnX, c_spawnY);
     EXPECT_EQ(player.direction, Core::Direction::None);
     EXPECT_FALSE(player.isMoving);

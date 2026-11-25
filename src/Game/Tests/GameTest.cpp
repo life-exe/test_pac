@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <array>
 #include <cstddef>
+#include <format>
 #include <memory>
+#include <ostream>
+#include <string>
 #include <string_view>
 
 #include "Game.h"
@@ -246,27 +250,30 @@ constexpr std::string_view c_comboLevel{"##########\n"
 TEST(GameCoreTest, InitialState)
 {
     const Core::Game game;
-    EXPECT_EQ(game.state(), Core::GameState::Playing);
+    EXPECT_EQ(game.state(), Core::GameState::MainMenu);
     EXPECT_DOUBLE_EQ(game.totalTime(), 0.0);
 }
 
+// makePlayingGame has already spent the Ready pause, so time is measured as a difference
 TEST(GameCoreTest, AccumulatesTotalTimeWhilePlaying)
 {
-    Core::Game game;
+    Core::Game game{Tests::makePlayingGame()};
+    const double before{game.totalTime()};
     game.update(0.5f);
     game.update(0.25f);
 
-    EXPECT_DOUBLE_EQ(game.totalTime(), 0.75);
+    EXPECT_DOUBLE_EQ(game.totalTime() - before, 0.75);
 }
 
 TEST(GameCoreTest, SnapshotCopiesCoreState)
 {
-    Core::Game game;
+    Core::Game game{Tests::makePlayingGame()};
+    const double before{game.totalTime()};
     game.update(0.5f);
 
     const Core::GameSnapshot snapshot{game.snapshot()};
     EXPECT_EQ(snapshot.state, Core::GameState::Playing);
-    EXPECT_DOUBLE_EQ(snapshot.totalTime, 0.5);
+    EXPECT_DOUBLE_EQ(snapshot.totalTime - before, 0.5);
 }
 
 TEST(GameCoreTest, GameStateToString)
@@ -275,55 +282,71 @@ TEST(GameCoreTest, GameStateToString)
     EXPECT_EQ(Core::toString(Core::GameState::Paused), "Paused");
     EXPECT_EQ(Core::toString(Core::GameState::GameOver), "GameOver");
     EXPECT_EQ(Core::toString(Core::GameState::Victory), "Victory");
+    EXPECT_EQ(Core::toString(Core::GameState::MainMenu), "MainMenu");
+    EXPECT_EQ(Core::toString(Core::GameState::Exit), "Exit");
 }
 
 TEST(GameCoreTest, HandlesPauseAndResumeCommands)
 {
-    Core::Game game;
+    Core::Game game{Tests::makePlayingGame()};
     game.handleCommand(Core::Command::Pause);
     EXPECT_EQ(game.state(), Core::GameState::Paused);
 
+    const double pausedAt{game.totalTime()};
     game.update(1.0f);
-    EXPECT_DOUBLE_EQ(game.totalTime(), 0.0);
+    EXPECT_DOUBLE_EQ(game.totalTime() - pausedAt, 0.0);
 
     game.handleCommand(Core::Command::Resume);
     EXPECT_EQ(game.state(), Core::GameState::Playing);
 
+    const double resumedAt{game.totalTime()};
     game.update(0.25f);
-    EXPECT_DOUBLE_EQ(game.totalTime(), 0.25);
+    EXPECT_DOUBLE_EQ(game.totalTime() - resumedAt, 0.25);
 }
 
 TEST(GameCoreTest, HandlesTogglePauseCommand)
 {
-    Core::Game game;
+    Core::Game game{Tests::makePlayingGame()};
     game.handleCommand(Core::Command::TogglePause);
     EXPECT_EQ(game.state(), Core::GameState::Paused);
+
+    const double pausedAt{game.totalTime()};
+    game.update(1.0f);
+    EXPECT_DOUBLE_EQ(game.totalTime() - pausedAt, 0.0);
 
     game.handleCommand(Core::Command::TogglePause);
     EXPECT_EQ(game.state(), Core::GameState::Playing);
 
-    // A finished game cannot be paused or resumed
+    // The main menu is not a round, so it cannot be paused or resumed
     game.handleCommand(Core::Command::Quit);
     game.handleCommand(Core::Command::TogglePause);
-    EXPECT_EQ(game.state(), Core::GameState::GameOver);
+    EXPECT_EQ(game.state(), Core::GameState::MainMenu);
 }
 
 TEST(GameCoreTest, HandlesResetCommand)
 {
-    Core::Game game;
+    Core::Game game{Tests::makePlayingGame()};
     game.update(1.5f);
     game.handleCommand(Core::Command::Pause);
 
+    // Reset starts a new game, so the clock restarts from zero rather than from the old value
     game.handleCommand(Core::Command::Reset);
     EXPECT_EQ(game.state(), Core::GameState::Playing);
     EXPECT_DOUBLE_EQ(game.totalTime(), 0.0);
+
+    const double before{game.totalTime()};
+    game.update(0.5f);
+    EXPECT_DOUBLE_EQ(game.totalTime() - before, 0.5);
 }
 
 TEST(GameCoreTest, HandlesQuitCommand)
 {
-    Core::Game game;
+    Core::Game game{Tests::makePlayingGame()};
     game.handleCommand(Core::Command::Quit);
-    EXPECT_EQ(game.state(), Core::GameState::GameOver);
+    EXPECT_EQ(game.state(), Core::GameState::MainMenu);
+
+    game.handleCommand(Core::Command::Quit);
+    EXPECT_EQ(game.state(), Core::GameState::Exit);
 }
 
 TEST(GameCoreTest, CommandToString)
@@ -338,6 +361,7 @@ TEST(GameCoreTest, CommandToString)
     EXPECT_EQ(Core::toString(Core::Command::MoveDown), "MoveDown");
     EXPECT_EQ(Core::toString(Core::Command::MoveLeft), "MoveLeft");
     EXPECT_EQ(Core::toString(Core::Command::MoveRight), "MoveRight");
+    EXPECT_EQ(Core::toString(Core::Command::Confirm), "Confirm");
 }
 
 // --- Pellets, score and victory ---
@@ -758,3 +782,266 @@ TEST(GameBuffTest, ComboDoublesWithinOneFrightened)
     EXPECT_EQ(secondEat.lives, Core::c_startingLives);
     EXPECT_GT(secondEat.frightenedTimer, 0.0f);
 }
+
+// --- Screen state machine: one test per non-empty cell of the transition table ---
+
+namespace
+{
+
+// GameOver needs a map where the player meets a ghost; every other state uses the pellet corridor
+std::string_view levelFor(Core::GameState state)
+{
+    return state == Core::GameState::GameOver ? c_collisionLevel : c_corridorLevel;
+}
+
+// Builds a game standing in the given screen state. Every state inside a round already has some score,
+// so a new game is distinguishable from simply continuing the old one
+Core::Game makeGameIn(Core::GameState state)
+{
+    switch (state)
+    {
+        case Core::GameState::MainMenu: return Core::Game{Core::Maze::fromAscii(levelFor(state)).value()};
+        case Core::GameState::Playing:
+        {
+            Core::Game game{makeCorridorGame()};
+            game.update(secondsFor(1.0f));
+            return game;
+        }
+        case Core::GameState::Paused:
+        {
+            Core::Game game{makeGameIn(Core::GameState::Playing)};
+            game.handleCommand(Core::Command::Pause);
+            return game;
+        }
+        case Core::GameState::Victory:
+        {
+            Core::Game game{makeCorridorGame()};
+            game.update(secondsFor(static_cast<float>(c_corridorPellets)));
+            return game;
+        }
+        case Core::GameState::GameOver:
+        {
+            Core::Game game{Tests::makeReadyGame(levelFor(state))};
+            for (int life{0}; life < Core::c_startingLives; ++life)
+            {
+                loseLife(game);
+            }
+            return game;
+        }
+        case Core::GameState::Exit:
+        {
+            Core::Game game{makeGameIn(Core::GameState::MainMenu)};
+            game.handleCommand(Core::Command::Quit);
+            return game;
+        }
+    }
+    return Core::Game{};
+}
+
+int initialPelletsFor(Core::GameState state)
+{
+    return Core::Maze::fromAscii(levelFor(state)).value().remainingPellets();
+}
+
+// A new game: the round restarts from the Ready pause with a clean score, full lives and every pellet back
+void expectNewGame(const Core::Game& game, Core::GameState from)
+{
+    const Core::GameSnapshot snapshot{game.snapshot()};
+    EXPECT_EQ(snapshot.state, Core::GameState::Playing);
+    EXPECT_EQ(snapshot.roundPhase, Core::RoundPhase::Ready);
+    EXPECT_FLOAT_EQ(snapshot.phaseTimeLeft, Core::c_readyDuration);
+    EXPECT_DOUBLE_EQ(snapshot.totalTime, 0.0);
+    EXPECT_EQ(snapshot.score, 0);
+    EXPECT_EQ(snapshot.lives, Core::c_startingLives);
+    EXPECT_EQ(snapshot.remainingPellets, initialPelletsFor(from));
+}
+
+// Everything the player has achieved in the round stays as it was
+void expectSameProgress(const Core::GameSnapshot& before, const Core::GameSnapshot& after)
+{
+    EXPECT_EQ(after.score, before.score);
+    EXPECT_EQ(after.highScore, before.highScore);
+    EXPECT_DOUBLE_EQ(after.totalTime, before.totalTime);
+    EXPECT_EQ(after.roundPhase, before.roundPhase);
+    EXPECT_FLOAT_EQ(after.phaseTimeLeft, before.phaseTimeLeft);
+    EXPECT_EQ(after.lives, before.lives);
+    EXPECT_EQ(after.remainingPellets, before.remainingPellets);
+}
+
+// A screen change that is not a new game only switches the state and keeps the round untouched
+void expectScreenChange(Core::GameState from, Core::Command command, Core::GameState expected)
+{
+    Core::Game game{makeGameIn(from)};
+    ASSERT_EQ(game.state(), from);
+    const Core::GameSnapshot before{game.snapshot()};
+
+    game.handleCommand(command);
+    EXPECT_EQ(game.state(), expected);
+    expectSameProgress(before, game.snapshot());
+}
+
+void expectStartsNewGame(Core::GameState from, Core::Command command)
+{
+    Core::Game game{makeGameIn(from)};
+    ASSERT_EQ(game.state(), from);
+    ASSERT_GT(game.snapshot().score, 0);
+    const int highScore{game.snapshot().highScore};
+
+    game.handleCommand(command);
+    expectNewGame(game, from);
+    EXPECT_EQ(game.snapshot().highScore, highScore);
+}
+
+constexpr std::array c_endStates{Core::GameState::Victory, Core::GameState::GameOver};
+
+}  // namespace
+
+TEST(GameScreenTest, MainMenuConfirmStartsNewGame)
+{
+    Core::Game game{makeGameIn(Core::GameState::MainMenu)};
+    constexpr int savedHighScore{500};
+    game.setHighScore(savedHighScore);
+
+    game.handleCommand(Core::Command::Confirm);
+    expectNewGame(game, Core::GameState::MainMenu);
+    EXPECT_EQ(game.snapshot().highScore, savedHighScore);
+}
+
+TEST(GameScreenTest, MainMenuQuitExits)
+{
+    expectScreenChange(Core::GameState::MainMenu, Core::Command::Quit, Core::GameState::Exit);
+}
+
+TEST(GameScreenTest, PlayingTogglePausePauses)
+{
+    expectScreenChange(Core::GameState::Playing, Core::Command::TogglePause, Core::GameState::Paused);
+}
+
+TEST(GameScreenTest, PlayingPausePauses)
+{
+    expectScreenChange(Core::GameState::Playing, Core::Command::Pause, Core::GameState::Paused);
+}
+
+TEST(GameScreenTest, PlayingResetStartsNewGame)
+{
+    expectStartsNewGame(Core::GameState::Playing, Core::Command::Reset);
+}
+
+TEST(GameScreenTest, PlayingQuitReturnsToMainMenu)
+{
+    expectScreenChange(Core::GameState::Playing, Core::Command::Quit, Core::GameState::MainMenu);
+}
+
+TEST(GameScreenTest, PausedTogglePauseResumes)
+{
+    expectScreenChange(Core::GameState::Paused, Core::Command::TogglePause, Core::GameState::Playing);
+}
+
+TEST(GameScreenTest, PausedResumeResumes)
+{
+    expectScreenChange(Core::GameState::Paused, Core::Command::Resume, Core::GameState::Playing);
+}
+
+TEST(GameScreenTest, PausedResetStartsNewGame)
+{
+    expectStartsNewGame(Core::GameState::Paused, Core::Command::Reset);
+}
+
+TEST(GameScreenTest, PausedQuitReturnsToMainMenu)
+{
+    expectScreenChange(Core::GameState::Paused, Core::Command::Quit, Core::GameState::MainMenu);
+}
+
+TEST(GameScreenTest, EndScreenConfirmStartsNewGame)
+{
+    for (const Core::GameState endState : c_endStates)
+    {
+        SCOPED_TRACE(Core::toString(endState));
+        expectStartsNewGame(endState, Core::Command::Confirm);
+    }
+}
+
+TEST(GameScreenTest, EndScreenResetStartsNewGame)
+{
+    for (const Core::GameState endState : c_endStates)
+    {
+        SCOPED_TRACE(Core::toString(endState));
+        expectStartsNewGame(endState, Core::Command::Reset);
+    }
+}
+
+TEST(GameScreenTest, EndScreenQuitReturnsToMainMenu)
+{
+    for (const Core::GameState endState : c_endStates)
+    {
+        SCOPED_TRACE(Core::toString(endState));
+        expectScreenChange(endState, Core::Command::Quit, Core::GameState::MainMenu);
+    }
+}
+
+// --- Screen state machine: every "-" cell of the transition table ---
+
+namespace
+{
+
+struct IgnoredCommandCase
+{
+    Core::GameState state{Core::GameState::MainMenu};
+    Core::Command command{Core::Command::None};
+};
+
+// gtest prints unknown parameters as raw bytes, so a failure names the table cell instead
+void PrintTo(const IgnoredCommandCase& cell, std::ostream* out)
+{
+    *out << Core::toString(cell.state) << " + " << Core::toString(cell.command);
+}
+
+std::string ignoredCaseName(const testing::TestParamInfo<IgnoredCommandCase>& info)
+{
+    return std::format("{}_{}", Core::toString(info.param.state), Core::toString(info.param.command));
+}
+
+constexpr std::array c_ignoredCommandCases{
+    IgnoredCommandCase{.state = Core::GameState::MainMenu, .command = Core::Command::TogglePause},
+    IgnoredCommandCase{.state = Core::GameState::MainMenu, .command = Core::Command::Pause},
+    IgnoredCommandCase{.state = Core::GameState::MainMenu, .command = Core::Command::Resume},
+    IgnoredCommandCase{.state = Core::GameState::MainMenu, .command = Core::Command::Reset},
+    IgnoredCommandCase{.state = Core::GameState::Playing, .command = Core::Command::Confirm},
+    IgnoredCommandCase{.state = Core::GameState::Playing, .command = Core::Command::Resume},
+    IgnoredCommandCase{.state = Core::GameState::Paused, .command = Core::Command::Confirm},
+    IgnoredCommandCase{.state = Core::GameState::Paused, .command = Core::Command::Pause},
+    IgnoredCommandCase{.state = Core::GameState::Victory, .command = Core::Command::TogglePause},
+    IgnoredCommandCase{.state = Core::GameState::Victory, .command = Core::Command::Pause},
+    IgnoredCommandCase{.state = Core::GameState::Victory, .command = Core::Command::Resume},
+    IgnoredCommandCase{.state = Core::GameState::GameOver, .command = Core::Command::TogglePause},
+    IgnoredCommandCase{.state = Core::GameState::GameOver, .command = Core::Command::Pause},
+    IgnoredCommandCase{.state = Core::GameState::GameOver, .command = Core::Command::Resume},
+    IgnoredCommandCase{.state = Core::GameState::Exit, .command = Core::Command::Confirm},
+    IgnoredCommandCase{.state = Core::GameState::Exit, .command = Core::Command::TogglePause},
+    IgnoredCommandCase{.state = Core::GameState::Exit, .command = Core::Command::Pause},
+    IgnoredCommandCase{.state = Core::GameState::Exit, .command = Core::Command::Resume},
+    IgnoredCommandCase{.state = Core::GameState::Exit, .command = Core::Command::Reset},
+    IgnoredCommandCase{.state = Core::GameState::Exit, .command = Core::Command::Quit},
+};
+
+class GameIgnoredCommandTest : public testing::TestWithParam<IgnoredCommandCase>
+{
+};
+
+}  // namespace
+
+TEST_P(GameIgnoredCommandTest, CommandChangesNothing)
+{
+    const IgnoredCommandCase& cell{GetParam()};
+    Core::Game game{makeGameIn(cell.state)};
+    ASSERT_EQ(game.state(), cell.state);
+    const Core::GameSnapshot before{game.snapshot()};
+
+    game.handleCommand(cell.command);
+    const Core::GameSnapshot after{game.snapshot()};
+    EXPECT_EQ(after.state, cell.state);
+    expectSameProgress(before, after);
+    expectEntitiesFrozen(before, after);
+}
+
+INSTANTIATE_TEST_SUITE_P(ScreenTable, GameIgnoredCommandTest, testing::ValuesIn(c_ignoredCommandCases), ignoredCaseName);

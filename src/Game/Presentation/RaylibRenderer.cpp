@@ -307,7 +307,7 @@ void drawBottomHud(const Core::GameSnapshot& snapshot, ScreenSize screen, const 
     const std::string diagnosticsText{std::format("FPS: {}  Time: {:.2f}s", GetFPS(), snapshot.totalTime)};
     drawTextRightAligned(diagnosticsText, screen.width - sidePadding, firstLineY, fontSize, LIGHTGRAY);
 
-    DrawText("Controls: [WASD/Arrows] Move | [P] Pause/Resume | [R] Reset | [ESC] Quit", sidePadding, secondLineY, fontSize, GRAY);
+    DrawText("Controls: [WASD/Arrows] Move | [P] Pause/Resume | [R] Reset | [ESC] Menu", sidePadding, secondLineY, fontSize, GRAY);
 }
 
 void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen, const Texture2D& spritesheet)
@@ -316,43 +316,194 @@ void drawHud(const Core::GameSnapshot& snapshot, ScreenSize screen, const Textur
     drawBottomHud(snapshot, screen, spritesheet);
 }
 
+// The menu and every overlay centre their lines the same way, so the screens stay visually aligned
+void drawCenteredText(const char* text, ScreenSize screen, int y, int fontSize, Color color)
+{
+    DrawText(text, (screen.width - MeasureText(text, fontSize)) / 2, y, fontSize, color);
+}
+
 // Victory and Game Over cover the whole screen: the round is over, and the dimmed maze shows how it ended
 void drawEndOverlay(ScreenSize screen, const char* title, Color titleColor)
 {
     DrawRectangle(0, 0, screen.width, screen.height, Fade(BLACK, 0.6f));
 
     constexpr int titleFontSize{48};
-    const int titleWidth{MeasureText(title, titleFontSize)};
-    const int titleY{(screen.height / 2) - titleFontSize};
-    DrawText(title, (screen.width - titleWidth) / 2, titleY, titleFontSize, titleColor);
-
-    constexpr const char* hint{"PRESS [R] TO RESTART"};
     constexpr int hintFontSize{24};
-    const int hintWidth{MeasureText(hint, hintFontSize)};
-    DrawText(hint, (screen.width - hintWidth) / 2, titleY + titleFontSize + 16, hintFontSize, RAYWHITE);
+    constexpr int lineGap{16};
+    const int titleY{(screen.height / 2) - titleFontSize};
+    const int playAgainY{titleY + titleFontSize + lineGap};
+    drawCenteredText(title, screen, titleY, titleFontSize, titleColor);
+    drawCenteredText("PRESS [ENTER] OR [R] TO PLAY AGAIN", screen, playAgainY, hintFontSize, RAYWHITE);
+    drawCenteredText("[ESC] MAIN MENU", screen, playAgainY + hintFontSize + lineGap, hintFontSize - 4, LIGHTGRAY);
 }
 
+// Pause keeps the maze visible under a lighter veil, so the player can study the situation before resuming
 void drawPauseOverlay(ScreenSize screen)
 {
-    constexpr const char* text{"PAUSED - PRESS [P] TO RESUME"};
-    constexpr int fontSize{30};
-    const int textWidth{MeasureText(text, fontSize)};
-    const int x{(screen.width - textWidth) / 2};
-    const int y{(screen.height - fontSize) / 2};
-    // Dim backdrop keeps the message readable on top of the walls
-    DrawRectangle(x - 16, y - 12, textWidth + 32, fontSize + 24, Fade(BLACK, 0.8f));
-    DrawText(text, x, y, fontSize, ORANGE);
+    DrawRectangle(0, 0, screen.width, screen.height, Fade(BLACK, 0.5f));
+
+    constexpr int titleFontSize{40};
+    constexpr int hintFontSize{20};
+    constexpr int lineGap{16};
+    const int titleY{(screen.height / 2) - titleFontSize};
+    drawCenteredText("PAUSED", screen, titleY, titleFontSize, ORANGE);
+    drawCenteredText("[P] RESUME   [R] RESTART   [ESC] MAIN MENU", screen, titleY + titleFontSize + lineGap, hintFontSize, RAYWHITE);
 }
 
 void drawStateOverlay(Core::GameState state, ScreenSize screen)
 {
     switch (state)
     {
-        case Core::GameState::Playing: return;
         case Core::GameState::Paused: drawPauseOverlay(screen); return;
         case Core::GameState::GameOver: drawEndOverlay(screen, "GAME OVER", RED); return;
         case Core::GameState::Victory: drawEndOverlay(screen, "VICTORY!", GOLD); return;
+        case Core::GameState::Playing:
+        case Core::GameState::MainMenu:
+        case Core::GameState::Exit: return;
     }
+}
+
+// The maze, the entities, the HUD and the state overlay: everything drawn while a round exists
+void drawRound(const Core::GameSnapshot& snapshot, ScreenSize screen, const Texture2D& spritesheet)
+{
+    // A default snapshot has no maze, and the layout would divide by zero
+    if (snapshot.mazeRows > 0 && snapshot.mazeCols > 0)
+    {
+        const MazeLayout layout{computeLayout(snapshot, screen)};
+        drawMaze(snapshot, layout, spritesheet);
+        drawPlayer(snapshot, layout, spritesheet);
+        // Ghosts vanish while the player collapses, so the death animation is the only thing moving on the field
+        if (snapshot.roundPhase != Core::RoundPhase::PlayerDying)
+        {
+            for (const Core::GhostSnapshot& ghost : snapshot.ghosts)
+            {
+                drawGhost(ghost, snapshot, layout, spritesheet);
+            }
+        }
+        if (snapshot.state == Core::GameState::Playing && snapshot.roundPhase == Core::RoundPhase::Ready)
+        {
+            drawReadyText(snapshot, layout);
+        }
+    }
+    drawHud(snapshot, screen, spritesheet);
+    drawStateOverlay(snapshot.state, screen);
+}
+
+// --- Main menu ---
+
+void drawSprite(const Texture2D& spritesheet, SpriteRect sprite, Rectangle dest, Color tint)
+{
+    DrawTexturePro(spritesheet, toRectangle(sprite), dest, {0.0f, 0.0f}, 0.0f, tint);
+}
+
+struct GhostCard
+{
+    Core::GhostId id{Core::GhostId::Ruby};
+    const char* name{""};
+};
+
+constexpr std::array c_ghostCards{
+    GhostCard{.id = Core::GhostId::Ruby, .name = "Ruby"},
+    GhostCard{.id = Core::GhostId::Rosie, .name = "Rosie"},
+    GhostCard{.id = Core::GhostId::Indigo, .name = "Indigo"},
+    GhostCard{.id = Core::GhostId::Coral, .name = "Coral"},
+};
+
+// Each ghost gets an equal slot across the screen, tinted like in the maze and named in its own colour
+// The clock goes last, away from the int row, so the two numbers cannot be swapped at the call site
+void drawGhostParade(ScreenSize screen, int top, const Texture2D& spritesheet, double clock)
+{
+    constexpr int iconSize{3 * c_tileSize};  // a whole multiple of the atlas tile keeps the pixel art crisp
+    constexpr int nameFontSize{20};
+    constexpr int nameGap{8};
+    constexpr double skirtPhasesPerSecond{6.0};
+    const int phase{static_cast<int>(clock * skirtPhasesPerSecond)};
+    const int slotWidth{screen.width / static_cast<int>(c_ghostCards.size())};
+
+    for (std::size_t index{0}; index < c_ghostCards.size(); ++index)
+    {
+        const GhostCard& card{c_ghostCards[index]};
+        const int centreX{(slotWidth * static_cast<int>(index)) + (slotWidth / 2)};
+        const int iconLeft{centreX - (iconSize / 2)};
+        const Rectangle dest{
+            static_cast<float>(iconLeft), static_cast<float>(top), static_cast<float>(iconSize), static_cast<float>(iconSize)};
+        const Color tint{ghostTint(card.id)};
+        drawSprite(spritesheet, ghostBodyFrame(phase), dest, tint);
+        drawSprite(spritesheet, ghostEyesFrame(Core::Direction::Down), dest, WHITE);
+
+        const int nameWidth{MeasureText(card.name, nameFontSize)};
+        DrawText(card.name, centreX - (nameWidth / 2), top + iconSize + nameGap, nameFontSize, tint);
+    }
+}
+
+struct ScoreRow
+{
+    SpriteRect sprite{};
+    std::string points;
+};
+
+// The points come from the core constants, so the menu cannot drift from the real scoring
+void drawScoreTable(ScreenSize screen, int top, const Texture2D& spritesheet)
+{
+    constexpr int iconSize{2 * c_tileSize};
+    constexpr int iconGap{16};
+    constexpr int fontSize{20};
+    constexpr int rowHeight{40};
+    constexpr int ghostScore{Core::c_baseGhostEatScore};
+    const std::array rows{
+        ScoreRow{.sprite = pelletSprite(), .points = std::format("{} PTS", Core::c_pelletScore)},
+        ScoreRow{.sprite = powerPelletSprite(), .points = std::format("{} PTS", Core::c_powerPelletScore)},
+        ScoreRow{.sprite = ghostFrightenedFrame(false),
+            .points = std::format("{} / {} / {} / {} PTS", ghostScore, 2 * ghostScore, 4 * ghostScore, 8 * ghostScore)},
+    };
+
+    // The icons form one column and the points another, so the block is centred by its widest line
+    int widestText{0};
+    for (const ScoreRow& row : rows)
+    {
+        widestText = std::max(widestText, MeasureText(row.points.c_str(), fontSize));
+    }
+    const int blockLeft{(screen.width - (iconSize + iconGap + widestText)) / 2};
+
+    for (std::size_t index{0}; index < rows.size(); ++index)
+    {
+        const int rowTop{top + (static_cast<int>(index) * rowHeight)};
+        const Rectangle dest{
+            static_cast<float>(blockLeft), static_cast<float>(rowTop), static_cast<float>(iconSize), static_cast<float>(iconSize)};
+        drawSprite(spritesheet, rows[index].sprite, dest, WHITE);
+        DrawText(rows[index].points.c_str(), blockLeft + iconSize + iconGap, rowTop + ((iconSize - fontSize) / 2), fontSize, WHITE);
+    }
+}
+
+// The clock goes first, away from the int row, so the two numbers cannot be swapped at the call site
+void drawStartPrompt(double clock, ScreenSize screen, int top)
+{
+    constexpr double blinkPeriod{0.5};  // seconds the prompt stays visible, then hidden
+    constexpr int promptFontSize{28};
+    constexpr int exitFontSize{20};
+    constexpr int lineGap{12};
+    if (static_cast<int>(clock / blinkPeriod) % 2 == 0)
+    {
+        drawCenteredText("PRESS [ENTER] TO START", screen, top, promptFontSize, WHITE);
+    }
+    drawCenteredText("[ESC] EXIT", screen, top + promptFontSize + lineGap, exitFontSize, GRAY);
+}
+
+// The core does not update in MainMenu, so totalTime stands still; the window clock animates the menu instead
+void drawMainMenu(const Core::GameSnapshot& snapshot, ScreenSize screen, const Texture2D& spritesheet)
+{
+    constexpr int titleFontSize{56};
+    constexpr int highScoreFontSize{24};
+    const double clock{GetTime()};
+    // Rows are placed by a share of the height, so the layout follows the window size from config.json
+    const auto rowAt{[screen](float share) { return static_cast<int>(static_cast<float>(screen.height) * share); }};
+
+    drawCenteredText("MAZE CHOMP", screen, rowAt(0.08f), titleFontSize, YELLOW);
+    drawGhostParade(screen, rowAt(0.24f), spritesheet, clock);
+    drawScoreTable(screen, rowAt(0.46f), spritesheet);
+    const std::string highScoreText{std::format("HIGH SCORE: {}", snapshot.highScore)};
+    drawCenteredText(highScoreText.c_str(), screen, rowAt(0.72f), highScoreFontSize, GOLD);
+    drawStartPrompt(clock, screen, rowAt(0.82f));
 }
 
 }  // namespace
@@ -411,27 +562,16 @@ void RaylibRenderer::render(const Core::GameSnapshot& snapshot) const
     BeginDrawing();
     ClearBackground(BLACK);
 
-    // A default snapshot has no maze, and the layout would divide by zero
-    if (snapshot.mazeRows > 0 && snapshot.mazeCols > 0)
+    switch (snapshot.state)
     {
-        const MazeLayout layout{computeLayout(snapshot, screen)};
-        drawMaze(snapshot, layout, m_spritesheet);
-        drawPlayer(snapshot, layout, m_spritesheet);
-        // Ghosts vanish while the player collapses, so the death animation is the only thing moving on the field
-        if (snapshot.roundPhase != Core::RoundPhase::PlayerDying)
-        {
-            for (const Core::GhostSnapshot& ghost : snapshot.ghosts)
-            {
-                drawGhost(ghost, snapshot, layout, m_spritesheet);
-            }
-        }
-        if (snapshot.state == Core::GameState::Playing && snapshot.roundPhase == Core::RoundPhase::Ready)
-        {
-            drawReadyText(snapshot, layout);
-        }
+        case Core::GameState::MainMenu: drawMainMenu(snapshot, screen, m_spritesheet); break;
+        // The main loop ends on this frame, so there is nothing worth drawing
+        case Core::GameState::Exit: break;
+        case Core::GameState::Playing:
+        case Core::GameState::Paused:
+        case Core::GameState::GameOver:
+        case Core::GameState::Victory: drawRound(snapshot, screen, m_spritesheet); break;
     }
-    drawHud(snapshot, screen, m_spritesheet);
-    drawStateOverlay(snapshot.state, screen);
 
     EndDrawing();
 }
@@ -453,6 +593,12 @@ std::vector<Core::Command> RaylibRenderer::processInput() const
     if (IsKeyPressed(KEY_R))
     {
         commands.push_back(Core::Command::Reset);
+    }
+
+    // The core decides what Confirm means: start from the menu, play again after the round, or nothing
+    if (IsKeyPressed(KEY_ENTER))
+    {
+        commands.push_back(Core::Command::Confirm);
     }
 
     if (IsKeyPressed(KEY_ESCAPE))

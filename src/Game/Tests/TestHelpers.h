@@ -4,6 +4,7 @@
 #include <string_view>
 #include <utility>
 
+#include "Command.h"
 #include "Game.h"
 #include "GameConstants.h"
 #include "Maze.h"
@@ -25,16 +26,19 @@ inline constexpr std::string_view c_smallLevel{"###########\n"
                                                "#.........#\n"
                                                "###########\n"};
 
-// Creates a game on the given map in Playing / RoundPhase::Ready (without skipping the Ready pause).
+// Creates a game on the given map, confirms past MainMenu and leaves it in Playing / RoundPhase::Ready.
 inline Core::Game makeReadyGame(std::string_view asciiMap = c_smallLevel)
 {
-    return Core::Game{Core::Maze::fromAscii(asciiMap).value()};
+    Core::Game game{Core::Maze::fromAscii(asciiMap).value()};
+    game.handleCommand(Core::Command::Confirm);
+    return game;
 }
 
-// Creates a game on the given map with a custom random source and advances through Ready to Active.
+// Creates a game on the given map with a custom random source, confirms past MainMenu and advances through Ready to Active.
 inline Core::Game makePlayingGame(std::string_view asciiMap, std::unique_ptr<Core::IRandomSource> random)
 {
     Core::Game game{Core::Maze::fromAscii(asciiMap).value(), std::move(random)};
+    game.handleCommand(Core::Command::Confirm);
     while (game.state() == Core::GameState::Playing && game.snapshot().roundPhase == Core::RoundPhase::Ready)
     {
         game.update(Core::c_maxSubstep);
