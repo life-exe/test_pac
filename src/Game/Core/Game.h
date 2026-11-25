@@ -2,6 +2,7 @@
 
 #include <array>
 #include <memory>
+#include <vector>
 
 #include "Command.h"
 #include "GameSnapshot.h"
@@ -10,6 +11,7 @@
 #include "Player.h"
 #include "Types.h"
 #include "GameConstants.h"
+#include "GameEvents.h"
 
 namespace LifeExe::Core
 {
@@ -29,6 +31,7 @@ public:
     GameState state() const { return m_state; }
     double totalTime() const { return m_totalTime; }
     GameSnapshot snapshot() const;
+    std::vector<GameEvent> takeEvents();
 
 private:
     static std::array<Ghost, 4> createGhosts(const Maze& maze);
@@ -62,6 +65,8 @@ private:
     std::unique_ptr<IRandomSource> m_random;
     float m_frightenedTimer{0.0f};
     int m_eatenGhostCombo{0};
+
+    std::vector<GameEvent> m_events;
 };
 
 }  // namespace LifeExe::Core

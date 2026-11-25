@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "HighScoreStorage.h"
 #include "RaylibRenderer.h"
+#include "SoundSystem.h"
 #include "Timer.h"
 
 #include <algorithm>
@@ -53,6 +54,8 @@ int main()
         Presentation::RaylibRenderer renderer;
         renderer.init(config.width, config.height, config.title);
 
+        Presentation::SoundSystem soundSystem;
+
         App::Timer timer;
 
         constexpr float fixedDt{1.0f / 60.0f};
@@ -77,6 +80,9 @@ int main()
                 game.update(fixedDt);
                 accumulator -= fixedDt;
             }
+
+            // The core queues events across fixed steps, so one drain per frame plays everything this frame produced
+            soundSystem.processEvents(game.takeEvents());
 
             // A finished round is the natural checkpoint for the record, so a crash later cannot lose it
             if (!isRoundOver(stateBeforeUpdate) && isRoundOver(game.state()))
